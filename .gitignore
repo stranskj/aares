@@ -1,0 +1,16 @@
+.venv
+.project
+.pydevproject
+.settings
+~*
+.~
+test*
+*.swp
+*.bck
+__pycache__
+*.egg-info
+.eggs
+dist
+.tox
+.idea
+*.log
