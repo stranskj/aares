@@ -47,6 +47,16 @@ def vector_from_string(vecin):
     ls = vecin.split(',')
     return numpy.array(ls, dtype=float)
 
+def rotation_factory(rotation_matrix):
+    def operator(x):
+        return rotation_matrix @ x
+    return operator
+
+def translation_factory(translation_vector):
+    def operator(x):
+        return x + translation_vector
+    return operator
+
 def get_detector_transformation_list(header):
     '''
     Reads the header and creates list of operators (function objects) for each detector transformation
@@ -62,13 +72,11 @@ def get_detector_transformation_list(header):
         if transformation.attrs['transformation'].decode() == 'translation':
             u_vec = vector_from_string(transformation.attrs['vector'].decode())
             translation_vector = translate_by_vector(u_vec, transformation.item())
-            def operator(x):
-                return x + translation_vector
+            operator = translation_factory(translation_vector)
         elif transformation.attrs['transformation'].decode() == 'rotation':
             u_vec = vector_from_string(transformation.attrs['vector'].decode())
             rotation_matrix = rotate_by_axis_matrix(transformation.attrs['vector'],transformation.item())
-            def operator(x):
-                return rotation_matrix @ x
+            operator = rotation_factory(rotation_matrix)
         else:
             raise KeyError('Wrong transformation type:' + transformation['transformation'])
         operators_out.append(copy.deepcopy(operator))
