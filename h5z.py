@@ -218,8 +218,9 @@ class SaxspointH5():
                         'entry/data/x_pixel_offset',
                         'entry/data/y_pixel_offset',
                         'entry/instrument/detector/data',
-                        'entry/instrument/detector/x_pixel_offset',
-                        'entry/instrument/detector/y_pixel_offset', ]
+                        #'entry/instrument/detector/x_pixel_offset',
+                        #'entry/instrument/detector/y_pixel_offset',
+                        ]
         if path is None:
             try:
                 path = self.attrs['abs_path']

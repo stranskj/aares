@@ -1,6 +1,7 @@
 import h5z
 import h5py
 import numpy
+import numexpr3 as numexpr
 import math
 import copy
 
@@ -83,6 +84,27 @@ def get_detector_transformation_list(header):
 
     return operators_out
 
+def transform_detector(header, operator):
+    '''
+    Calculate coordinates of individual pixels in space
+    :param header: SaxspoinH5 - file header
+    :param operator: function - Operation to perform with the detector plane. Typically output of get_compostion_operator()
+    :return: XYZ of the pixels
+    '''
+
+    x0 = header['entry/instrument/detector/x_pixel_offset'][:]
+    y0 = header['entry/instrument/detector/y_pixel_offset'][:]
+    #x0 = numpy.array([1,2,3,4,5,6])
+    #y0 = numpy.array([6,7,8,9,10,11,12])
+    zero = numpy.array([0])
+
+    XY0 = numpy.array(numpy.meshgrid(y0,x0,zero)).T.reshape(-1,3)
+
+   # vec_operator = numpy.vectorize(operator)
+    XYZ= numpy.apply_along_axis(operator, axis=1, arr= XY0)
+
+    return
+
 def get_composition_operator(operator_list):
     '''
     Creates a single function which applies list of operators at the input vector
@@ -104,7 +126,8 @@ def test(fin):
     h5in = h5z.SaxspointH5(fin)
     det_pos = numpy.array([0.1, .2, 0])
     trans_list = get_detector_transformation_list(h5in)
-    pos_xyz = get_composition_operator(trans_list)(det_pos)
+    det_trans = get_composition_operator(trans_list)
+    pixel_XYZ = transform_detector(h5in,det_trans)
 
     pass
 
