@@ -72,10 +72,10 @@ def detector_real_space(header):
     #y0 = numpy.array([6,7,8,9])
     zero = numpy.array([0])
 
-  #  X0, Y0 = numpy.meshgrid(y0,x0)
+    X0, Y0 = numpy.meshgrid(y0,x0)
    # Z0 = numpy.zeros(X0.shape)
 
-    XYZ = numpy.array(numpy.meshgrid(y0,x0,zero)).T.reshape(-1,3)
+    XYZ = numpy.array(numpy.meshgrid(x0,y0,zero)).T.reshape(-1,3)
 
     detector = 'entry/instrument/detector'
     transformation = header[detector]
@@ -141,13 +141,46 @@ def transform_detector(header, operator):
     #x0 = numpy.array([1,2,3,4,5,6])
     #y0 = numpy.array([6,7,8,9,10,11,12])
     zero = numpy.array([0])
-
+    gr = numpy.meshgrid(y0,x0,zero)
     XY0 = numpy.array(numpy.meshgrid(y0,x0,zero)).T.reshape(-1,3)
 
    # vec_operator = numpy.vectorize(operator)
 #    XYZ= pwr.parallel_apply_along_axis(operator, axis=1, arr= XY0)
     XYZ = numpy.apply_along_axis(operator, axis=1, arr=XY0)
     return XYZ
+
+def get_q(XYZ, beam_vec, wavelength = 1):
+    '''
+    Calculates radial q-values for the pixels
+    :param XYZ: array of vectors ( dimensions 3,N)
+    :param beam_vec: beam vector
+    :param wavelength: X-ray wavelength. Units define output units.
+    :return: numpy.array of q-values, 1D
+    '''
+    beam_norm = math.sqrt(beam_vec[0]*beam_vec[0]+beam_vec[1]*beam_vec[1]+beam_vec[2]*beam_vec[2]) * beam_vec
+    XYZT = XYZ.T
+    cos2T = (beam_norm @ XYZT) / numpy.sqrt(XYZT[0]*XYZT[0]+XYZT[1]*XYZT[1]+XYZT[2]*XYZT[2])
+    sinT = numpy.sqrt((1-cos2T)/2)
+    return sinT/wavelength
+
+def transform_detector_radial_q(header, beam = (0,0,1)):
+    '''
+    Perform q-transformation of the detector based on the header. Size of q-vector is returned for each pixel in an array coresponding to the frame.
+    :param header: SaxspointH5 File header
+    :return: numpy.array of frame dimensions
+    '''
+
+    if beam is not numpy.ndarray:
+        beam = numpy.array(beam)
+
+    XYZ = detector_real_space(header)
+
+    Q = get_q(XYZ, numpy.array([0, 0, 1]), header.wavelength)
+    x0 = header['entry/instrument/detector/x_pixel_offset'][:]
+    y0 = header['entry/instrument/detector/y_pixel_offset'][:]
+    arrQ = Q.reshape([len(x0),len(y0)], order='C').T
+
+    return arrQ
 
 def get_composition_operator(operator_list):
     '''
@@ -169,21 +202,45 @@ def get_composition_operator(operator_list):
 def test(fin):
 
     import time
+    import matplotlib.pyplot as plt
 
     h5in = h5z.SaxspointH5(fin)
 
+    a = numpy.array([[1,2,3],
+                     [4,5,6],
+                     [7,8,9],
+                     [1,2,3]])
+
+    aq = get_q(a, numpy.array([1,0,0]))
+
     t0 = time.time()
-    detector_real_space(h5in)
+    arrQ = transform_detector_radial_q(h5in, (0,0,1))
     dt1 = time.time() - t0
 
+    print(dt1)
+
+
+    qmin = numpy.amin(arrQ)
+    idx_qmin = numpy.where(arrQ == qmin)
+
+    print(arrQ[526,245])
+    print(arrQ[245, 526])
+
+    with h5z.FileH5Z(fin) as h5f:
+        fr = h5f['entry/data/data'][0]
+
+    #plt.imshow(fr)
+    plt.imshow(arrQ)
+    plt.show()
     det_pos = numpy.array([0.1, .2, 0])
 
-    t1 =time.time()
-    trans_list = get_detector_transformation_list(h5in)
-    det_trans = get_composition_operator(trans_list)
-    pixel_XYZ = transform_detector(h5in,det_trans)
-    dt2 = time.time() - t1
-    print(dt1,dt2)
+
+#    t1 =time.time()
+#    trans_list = get_detector_transformation_list(h5in)
+#    det_trans = get_composition_operator(trans_list)
+#    pixel_XYZ = transform_detector(h5in,det_trans)
+#    dt2 = time.time() - t1
+#    print(dt1,dt2)
     pass
 
 def main():
