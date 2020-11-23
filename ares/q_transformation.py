@@ -96,58 +96,6 @@ def detector_real_space(header):
 
     return XYZ
 
-def get_detector_transformation_list(header):
-    '''
-    Reads the header and creates list of operators (function objects) for each detector transformation
-    :param header: Header or open H5 file
-    :return: list of transformation operators as a function
-    '''
-    detector = 'entry/instrument/detector'
-    transformation = header[detector]
-    transformation.attrs['depends_on'] = transformation['depends_on'].item()
-    operators_out = []
-    while 'depends_on' in transformation.attrs:
-        transformation = header[detector+'/' + transformation.attrs['depends_on'].decode()]
-        if transformation.attrs['transformation'].decode() == 'translation':
-            u_vec = vector_from_string(transformation.attrs['vector'].decode())
-            translation_vector = translate_by_vector(u_vec, transformation.item())
-            operator = translation_factory(translation_vector)
-        elif transformation.attrs['transformation'].decode() == 'rotation':
-            u_vec = vector_from_string(transformation.attrs['vector'].decode())
-            rotation_matrix = rotate_by_axis_matrix(transformation.attrs['vector'],transformation.item())
-            operator = rotation_factory(rotation_matrix)
-        else:
-            raise KeyError('Wrong transformation type:' + transformation['transformation'])
-        operators_out.append(copy.deepcopy(operator))
-
-    return operators_out
-
-def fc(vec):
-    x = vec[0]
-    y= vec[1]
-    z= vec[2]
-    return math.sqrt(x*x + y*y + z*z)
-
-def transform_detector(header, operator):
-    '''
-    Calculate coordinates of individual pixels in space
-    :param header: SaxspoinH5 - file header
-    :param operator: function - Operation to perform with the detector plane. Typically output of get_compostion_operator()
-    :return: XYZ of the pixels
-    '''
-
-    x0 = header['entry/instrument/detector/x_pixel_offset'][:]
-    y0 = header['entry/instrument/detector/y_pixel_offset'][:]
-    #x0 = numpy.array([1,2,3,4,5,6])
-    #y0 = numpy.array([6,7,8,9,10,11,12])
-    zero = numpy.array([0])
-    gr = numpy.meshgrid(y0,x0,zero)
-    XY0 = numpy.array(numpy.meshgrid(y0,x0,zero)).T.reshape(-1,3)
-
-   # vec_operator = numpy.vectorize(operator)
-#    XYZ= pwr.parallel_apply_along_axis(operator, axis=1, arr= XY0)
-    XYZ = numpy.apply_along_axis(operator, axis=1, arr=XY0)
-    return XYZ
 
 def get_q(XYZ, beam_vec, wavelength = 1):
     '''
@@ -163,41 +111,35 @@ def get_q(XYZ, beam_vec, wavelength = 1):
     sinT = numpy.sqrt((1-cos2T)/2)
     return sinT/wavelength
 
-def transform_detector_radial_q(header, beam = (0,0,1)):
+def transform_detector_radial_q(header, beam = (0,0,1), unit='nm'):
     '''
     Perform q-transformation of the detector based on the header. Size of q-vector is returned for each pixel in an array coresponding to the frame.
     :param header: SaxspointH5 File header
     :return: numpy.array of frame dimensions
     '''
 
+    if unit == 'nm':
+        unit_multiplier = 10e-9
+    elif unit == 'A':
+        unit_multiplier = 10e-10
+    else:
+        raise AttributeError('Unknown unit: {}'.format(unit))
+
+    if not ((wl_unit := header['entry/instrument/monochromator/wavelength'].attrs['units'].decode()) == 'm'):
+        raise IOError('Unknown wavelength unit on input: {}'.format(wl_unit)) # TODO: Change to user error, when logging and stuff in place
+
+
     if beam is not numpy.ndarray:
         beam = numpy.array(beam)
 
     XYZ = detector_real_space(header)
 
-    Q = get_q(XYZ, numpy.array([0, 0, 1]), header.wavelength)
+    Q = get_q(XYZ, beam, header.wavelength/unit_multiplier)
     x0 = header['entry/instrument/detector/x_pixel_offset'][:]
     y0 = header['entry/instrument/detector/y_pixel_offset'][:]
     arrQ = Q.reshape([len(x0),len(y0)], order='C').T
 
     return arrQ
-
-def get_composition_operator(operator_list):
-    '''
-    Creates a single function which applies list of operators at the input vector
-    :param operator_list: list of functions
-    :return: function
-    '''
-
-    def operator(vec_in):
-        op_ls = operator_list
-        vec_out = copy.deepcopy(vec_in)
-        for op in op_ls:
-            vec_out = op(vec_out)
-
-        return vec_out
-
-    return operator
 
 def test(fin):
 
@@ -221,10 +163,13 @@ def test(fin):
 
 
     qmin = numpy.amin(arrQ)
+    qmax = numpy.max(arrQ)
     idx_qmin = numpy.where(arrQ == qmin)
 
-    print(arrQ[526,245])
+    print(qmin, qmax)
+
     print(arrQ[245, 526])
+    print(arrQ[245, 513])
 
     with h5z.FileH5Z(fin) as h5f:
         fr = h5f['entry/data/data'][0]
