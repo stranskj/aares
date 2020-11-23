@@ -4,6 +4,7 @@ import numpy
 import numexpr3 as numexpr
 import math
 import copy
+import ares.power as pwr
 
 def rotate_by_axis_matrix(axis, angle):
     '''
@@ -58,6 +59,43 @@ def translation_factory(translation_vector):
         return x + translation_vector
     return operator
 
+def detector_real_space(header):
+    '''
+    Transforms detector pixels into the realspace coordinates
+    :param header: Header or open H5 file
+    :return: X, Y, Z numpy.arrays of coordinates
+    '''
+
+    x0 = header['entry/instrument/detector/x_pixel_offset'][:]
+    y0 = header['entry/instrument/detector/y_pixel_offset'][:]
+    #x0 = numpy.array([1,2,3])
+    #y0 = numpy.array([6,7,8,9])
+    zero = numpy.array([0])
+
+  #  X0, Y0 = numpy.meshgrid(y0,x0)
+   # Z0 = numpy.zeros(X0.shape)
+
+    XYZ = numpy.array(numpy.meshgrid(y0,x0,zero)).T.reshape(-1,3)
+
+    detector = 'entry/instrument/detector'
+    transformation = header[detector]
+    transformation.attrs['depends_on'] = transformation['depends_on'].item()
+
+    while 'depends_on' in transformation.attrs:
+        transformation = header[detector+'/' + transformation.attrs['depends_on'].decode()]
+        if transformation.attrs['transformation'].decode() == 'translation':
+            u_vec = vector_from_string(transformation.attrs['vector'].decode())
+            translation_vector = translate_by_vector(u_vec, transformation.item())
+            XYZ = XYZ + translation_vector
+        elif transformation.attrs['transformation'].decode() == 'rotation':
+            u_vec = vector_from_string(transformation.attrs['vector'].decode())
+            rotation_matrix_T = rotate_by_axis_matrix(transformation.attrs['vector'],transformation.item()).T
+            XYZ = XYZ @ rotation_matrix_T
+        else:
+            raise KeyError('Wrong transformation type:' + transformation['transformation'])
+
+    return XYZ
+
 def get_detector_transformation_list(header):
     '''
     Reads the header and creates list of operators (function objects) for each detector transformation
@@ -84,6 +122,12 @@ def get_detector_transformation_list(header):
 
     return operators_out
 
+def fc(vec):
+    x = vec[0]
+    y= vec[1]
+    z= vec[2]
+    return math.sqrt(x*x + y*y + z*z)
+
 def transform_detector(header, operator):
     '''
     Calculate coordinates of individual pixels in space
@@ -101,9 +145,9 @@ def transform_detector(header, operator):
     XY0 = numpy.array(numpy.meshgrid(y0,x0,zero)).T.reshape(-1,3)
 
    # vec_operator = numpy.vectorize(operator)
-    XYZ= numpy.apply_along_axis(operator, axis=1, arr= XY0)
-
-    return
+#    XYZ= pwr.parallel_apply_along_axis(operator, axis=1, arr= XY0)
+    XYZ = numpy.apply_along_axis(operator, axis=1, arr=XY0)
+    return XYZ
 
 def get_composition_operator(operator_list):
     '''
@@ -123,12 +167,23 @@ def get_composition_operator(operator_list):
     return operator
 
 def test(fin):
+
+    import time
+
     h5in = h5z.SaxspointH5(fin)
+
+    t0 = time.time()
+    detector_real_space(h5in)
+    dt1 = time.time() - t0
+
     det_pos = numpy.array([0.1, .2, 0])
+
+    t1 =time.time()
     trans_list = get_detector_transformation_list(h5in)
     det_trans = get_composition_operator(trans_list)
     pixel_XYZ = transform_detector(h5in,det_trans)
-
+    dt2 = time.time() - t1
+    print(dt1,dt2)
     pass
 
 def main():
