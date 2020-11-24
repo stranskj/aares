@@ -1,7 +1,5 @@
 import h5z
-import h5py
 import numpy
-import numexpr3 as numexpr
 import math
 import copy
 import ares.power as pwr
