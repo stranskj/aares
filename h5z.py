@@ -214,6 +214,7 @@ class SaxspointH5():
         return self.__h5.attrs
 
     def read_header(self, path=None, **filters):
+        #TODO: create as constructor option; store in member variable, if one of those attempted to read later, reopen the file
         skip_entries = ['entry/data/data',
                         'entry/data/x_pixel_offset',
                         'entry/data/y_pixel_offset',
