@@ -96,6 +96,38 @@ def detector_chip_mask(det_type):
 
     return mask
 
+def read_mask_from_image(image_in, channel='A', threshold =128, invert=False):
+    '''
+    Creates frame mask from a image; preferably PNG; light number is
+    :param image_in: Input file name
+    :param channel: Channel to be used for mask creation
+    :param threshold: Values higher than this threshold
+    :param invert: Invert the mask
+    :return:
+    '''
+
+    try:
+        with PIL.Image.open(image_in) as img_in:
+            if channel == 'A':
+                img_mask = img_in.split()[-1]
+            elif channel == 'RGB':
+                img_mask = img_in.convert(mode='1')
+            else:
+                raise ares.RuntimeErrorUser('Unsupported channel: {}'.format(channel))
+    except FileNotFoundError:
+        raise ares.RuntimeErrorUser('File not found: {}'.format(image_in))
+    except PIL.UnidentifiedImageError:
+        raise ares.RuntimeErrorUser('Unsupported image for mask.')
+
+    flipped = PIL.ImageOps.flip(img_mask)
+    mask_np = np.array(flipped.convert(mode='1').getdata()).reshape(img_mask.size[1], img_mask.size[0])
+
+    if invert:
+        mask = mask_np > 0
+    else:
+        mask = mask_np < 1
+    return mask
+
 def draw_mask(mask,output='mask.png'):
     """
     Draws a mask to an image
@@ -105,9 +137,11 @@ def draw_mask(mask,output='mask.png'):
     :return:
     """
     size = mask.shape[::-1]
-    databytes= np.packbits(mask, axis=1)
+    databytes= np.packbits(np.invert(mask), axis=1)
     img = PIL.Image.frombytes(mode='1', size=size, data=databytes)
-    flipped = PIL.ImageOps.flip(img)
+    img_rgb = img.convert(mode='RGBA')
+    img_rgb.putalpha(img)
+    flipped = PIL.ImageOps.flip(img_rgb)
     flipped.save(output)
 
 
@@ -132,8 +166,11 @@ def combine_masks(*list_of_masks):
     return out_mask
 
 def test():
-    mask = detector_chip_mask('Eiger R 1M')
-    draw_mask(mask,'chip_mask.png')
+#    mask = detector_chip_mask('Eiger R 1M')
+#    draw_mask(mask,'chip_mask.png')
+    mask = read_mask_from_image('frame_alpha_mask.png', 'A')
+
+    draw_mask(mask,'test_mask.png')
 
 
 def main():
