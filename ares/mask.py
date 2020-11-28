@@ -137,7 +137,7 @@ def draw_mask(mask,output='mask.png'):
     :return:
     """
     size = mask.shape[::-1]
-    databytes= np.packbits(np.invert(mask), axis=1)
+    databytes= np.packbits(np.invert(np.ascontiguousarray(mask)), axis=1)
     img = PIL.Image.frombytes(mode='1', size=size, data=databytes)
     img_rgb = img.convert(mode='RGBA')
     img_rgb.putalpha(img)
