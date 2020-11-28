@@ -12,10 +12,27 @@ Creating masks
 @deffield    updated: Updated
 """
 
+import ares
+
 import numpy as np
 import math
 import PIL.Image
 import PIL.ImageOps
+
+detectors = {
+    'Eiger R 1M' : {
+        'shape' : (1065,1030),   # X,Y size of detector
+        'Y-mask' : [
+            255,256,257,258,
+            513,514,515,516,
+            771,772,773,774
+                     ],
+        'X-mask' : [
+            255,256,257,258,
+            806,807,808,809
+                     ],
+    }
+}
 
 def rough_beamstop(beam_xy, frame_size, beamstop_pixel_radius):
     """
@@ -55,6 +72,30 @@ def rough_beamstop(beam_xy, frame_size, beamstop_pixel_radius):
     final_mask = np.logical_and(np.logical_or(stick_x, stick_y), circle)
     return final_mask
 
+def detector_chip_mask(det_type):
+    '''
+    Generates mask of pixels on chip boundaries
+
+    TODO: User configurable?
+
+    :param det_type: A detector from list "Detectors"
+    :return: numpy array of booleans
+    '''
+
+    try:
+        detector = detectors[det_type]
+    except KeyError:
+        raise ares.RuntimeErrorUser('Unknown detector type: {}\nAvailable types: {}'.format(det_type, list(detectors.keys())))
+
+    mask = np.ones(detector['shape'],dtype=bool)
+
+    for x in detector['X-mask']:
+        mask[x] = False
+    for y in detector['Y-mask']:
+        mask[:,y] = False
+
+    return mask
+
 def draw_mask(mask,output='mask.png'):
     """
     Draws a mask to an image
@@ -91,8 +132,9 @@ def combine_masks(*list_of_masks):
     return out_mask
 
 def test():
-    with h5z.FileH5Z('../data/AgBeh_826mm.h5z') as h5f:
-        draw(h5f['entry/data/data'][0],'frame.png','5*average')
+    mask = detector_chip_mask('Eiger R 1M')
+    draw_mask(mask,'chip_mask.png')
+
 
 def main():
     test()
