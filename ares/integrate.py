@@ -88,7 +88,7 @@ def integrate(frame_arr, bin_masks):
      #   int_mask = numpy.array([binm]*no_frame)
         binval = frame_arr[:,binm]
         averages.append(numpy.average(binval))
-        stdev.append(numpy.std(binval))
+        stdev.append(numpy.nanstd(binval)/math.sqrt(binval.size))
         num.append(binval.size)
 
     #int_masks = [numpy.array([msk]*no_frame) for msk in bin_masks]
