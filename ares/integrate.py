@@ -17,6 +17,8 @@ import h5py
 import numpy
 import math
 import ares.power as pwr
+import concurrent.futures
+import os
 
 def create_bins(qmin, qmax, bins):
     '''
@@ -80,12 +82,14 @@ def integrate(frame_arr, bin_masks):
 
     averages = []
     stdev    = []
+    num      = []
 
     for binm in bin_masks:
-        int_mask = numpy.array([binm]*no_frame)
-
-        averages.append(numpy.average(frame_arr[int_mask]))
-        stdev.append(numpy.std(frame_arr[int_mask]))
+     #   int_mask = numpy.array([binm]*no_frame)
+        binval = frame_arr[:,binm]
+        averages.append(numpy.average(binval))
+        stdev.append(numpy.std(binval))
+        num.append(binval.size)
 
     #int_masks = [numpy.array([msk]*no_frame) for msk in bin_masks]
 
@@ -95,7 +99,40 @@ def integrate(frame_arr, bin_masks):
 #    averages = map(numpy.average, [frame_arr]*len(bin_masks), int_masks)
 #    stdev = map(numpy.std,  [frame_arr] * len(bin_masks), int_masks)
 
-    return numpy.array(averages), numpy.array(stdev)
+    return numpy.array(averages), numpy.array(stdev), numpy.array(num)
+
+
+
+def integrate_mp(frame_arr, bin_masks, nproc=None):
+    '''
+    Calculate averages and stedevs across frames in all bins, parallel in multiple chunks
+    :param frame_arr: data; 3d np.array
+    :param bin_masks: bin masks
+    :return: np.array, np. array: averges and stdevs
+    '''
+
+    if nproc is None:
+        nproc = os.cpu_count()
+
+    with concurrent.futures.ProcessPoolExecutor(nproc) as ex:
+        results = ex.map(integrate, [frame_arr]*nproc, pwr.chunks(bin_masks,int(len(bin_masks)/nproc)+1))
+
+        res = numpy.concatenate(list(results),axis=1)
+
+        averages = res[0,:]
+        stdev    = res[1,:]
+        num      = res[2,:]
+
+    return averages, stdev, num
+
+def get_q(bins):
+    '''
+    Return q-values as X-axis labels
+    :param bins:
+    :return: np.array
+    '''
+    l = [(b[1]-b[0])/2+b[0] for b in bins]
+    return numpy.array(l)
 
 def test():
     import ares.q_transformation as qt
@@ -110,13 +147,19 @@ def test():
     arrQ = qt.transform_detector_radial_q(h5hd)
     print(time.time() -t0)
     q_bins = create_bins(arrQ.min(), arrQ.max(), 750)
+    q_vals = get_q(q_bins)
     print(time.time() - t0)
     q_masks = list_integration_masks(q_bins,arrQ)
     print(time.time() - t0)
 
     with h5z.FileH5Z(fin) as h5f:
-        avr, std = integrate(h5f['entry/data/data'][:], q_masks)
+        avr, std, num = integrate_mp(h5f['entry/data/data'][:], q_masks)
     print(time.time() - t0)
+
+    with open('data.dat','w') as fout:
+        for q, I, s in zip(q_vals,avr, std):
+            fout.write('{},{},{}\n'.format(q,I,s))
+
 
 
  #   mask.draw_mask(q_masks[10],'q_mask10.png')

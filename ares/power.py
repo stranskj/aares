@@ -43,3 +43,8 @@ def unpacking_apply_along_axis(all_args):
     """
     (func1d, axis, arr, args, kwargs) = all_args
     return np.apply_along_axis(func1d, axis, arr, *args, **kwargs)
+
+def chunks(lst, n):
+    """Yield successive n-sized chunks from lst."""
+    for i in range(0, len(lst), n):
+        yield lst[i:i + n]
