@@ -107,7 +107,7 @@ def get_q(XYZ, beam_vec, wavelength = 1):
     XYZT = XYZ.T
     cos2T = (beam_norm @ XYZT) / numpy.sqrt(XYZT[0]*XYZT[0]+XYZT[1]*XYZT[1]+XYZT[2]*XYZT[2])
     sinT = numpy.sqrt((1-cos2T)/2)
-    return sinT/wavelength
+    return 4*math.pi*sinT/wavelength
 
 def transform_detector_radial_q(header, beam = (0,0,1), unit='nm'):
     '''
@@ -117,9 +117,9 @@ def transform_detector_radial_q(header, beam = (0,0,1), unit='nm'):
     '''
 
     if unit == 'nm':
-        unit_multiplier = 10e-9
+        unit_multiplier = 1e-9
     elif unit == 'A':
-        unit_multiplier = 10e-10
+        unit_multiplier = 1e-10
     else:
         raise AttributeError('Unknown unit: {}'.format(unit))
 
