@@ -87,8 +87,12 @@ def integrate(frame_arr, bin_masks):
     for binm in bin_masks:
      #   int_mask = numpy.array([binm]*no_frame)
         binval = frame_arr[:,binm]
-        averages.append(numpy.average(binval))
-        stdev.append(numpy.nanstd(binval)/math.sqrt(binval.size))
+        if binval.size <= 0:
+            averages.append(numpy.nan)
+            stdev.append(numpy.nan)
+        else:
+            averages.append(numpy.nanmean(binval,dtype='float64'))
+            stdev.append(numpy.nanstd(binval,dtype='float64')/math.sqrt(binval.size))
         num.append(binval.size)
 
     #int_masks = [numpy.array([msk]*no_frame) for msk in bin_masks]
@@ -137,11 +141,15 @@ def get_q(bins):
 def test():
     import ares.q_transformation as qt
     import time
+    import ares.mask as am
     import ares.mask as mask
 
-    fin = '../data/10x60s_363mm_010Frames.h5'
+    fin = '../data/10x60s_826mm_010Frames.h5'
 
     h5hd = h5z.SaxspointH5(fin)
+
+    frame_mask = numpy.logical_and(am.read_mask_from_image('frame_alpha_mask_180.png',channel='A',invert=True),
+                                   am.detector_chip_mask('Eiger R 1M'))
 
     t0 = time.time()
     arrQ = qt.transform_detector_radial_q(h5hd)
@@ -149,14 +157,14 @@ def test():
     q_bins = create_bins(arrQ.min(), arrQ.max(), 750)
     q_vals = get_q(q_bins)
     print(time.time() - t0)
-    q_masks = list_integration_masks(q_bins,arrQ)
+    q_masks = list_integration_masks(q_bins,arrQ, frame_mask=frame_mask)
     print(time.time() - t0)
 
     with h5z.FileH5Z(fin) as h5f:
         avr, std, num = integrate_mp(h5f['entry/data/data'][:], q_masks)
     print(time.time() - t0)
 
-    with open('data.dat','w') as fout:
+    with open('data_826.dat','w') as fout:
         for q, I, s in zip(q_vals,avr, std):
             fout.write('{},{},{}\n'.format(q,I,s))
 
