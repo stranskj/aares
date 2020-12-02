@@ -94,6 +94,15 @@ def detector_real_space(header):
 
     return XYZ
 
+def get_q_axis(bins):
+    '''
+    Return q-values as X-axis labels
+    :param bins:
+    :return: np.array
+    '''
+    l = [(b[1]-b[0])/2+b[0] for b in bins]
+    return numpy.array(l)
+
 
 def get_q(XYZ, beam_vec, wavelength = 1):
     '''

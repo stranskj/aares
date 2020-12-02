@@ -93,6 +93,7 @@ def integrate(frame_arr, bin_masks):
         else:
             averages.append(numpy.nanmean(binval,dtype='float64'))
             stdev.append(numpy.nanstd(binval,dtype='float64')/math.sqrt(binval.size))
+          #  stdev.append(numpy.sqrt(averages[-1])/math.sqrt(binval.size))
         num.append(binval.size)
 
     #int_masks = [numpy.array([msk]*no_frame) for msk in bin_masks]
@@ -129,14 +130,7 @@ def integrate_mp(frame_arr, bin_masks, nproc=None):
 
     return averages, stdev, num
 
-def get_q(bins):
-    '''
-    Return q-values as X-axis labels
-    :param bins:
-    :return: np.array
-    '''
-    l = [(b[1]-b[0])/2+b[0] for b in bins]
-    return numpy.array(l)
+
 
 def test():
     import ares.q_transformation as qt
@@ -155,7 +149,7 @@ def test():
     arrQ = qt.transform_detector_radial_q(h5hd)
     print(time.time() -t0)
     q_bins = create_bins(arrQ.min(), arrQ.max(), 750)
-    q_vals = get_q(q_bins)
+    q_vals = qt.get_q_axis(q_bins)
     print(time.time() - t0)
     q_masks = list_integration_masks(q_bins,arrQ, frame_mask=frame_mask)
     print(time.time() - t0)
