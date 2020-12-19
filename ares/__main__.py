@@ -11,12 +11,27 @@ import pkg_resources
 import importlib
 import logging
 
+import freephil as phil
+
 # import psutil
 
 __version__ = ares.__version__
 
 prog_short_description = 'Another angular REduction for Saxs'
 
+
+phil_core = phil.parse('''
+input {
+    file_name = None
+    .type = path
+    .multiple = True
+    }
+
+masking {
+    include scope ares.mask.phil_core
+}
+    
+''', process_includes=True)
 
 def epilog():
     return_str = 'List of available commands in this package:\n'
@@ -73,6 +88,12 @@ class MainJob(ares.Job):
         Function, which is actually runned on class execution.
         """
         self._parser.print_help()
+
+    def __set_system_phil__(self):
+        '''
+        Settings of CLI arguments. self._parser to be used as argparse.ArgumentParser()
+        '''
+        self._system_phil = phil_core
 
     def __help_epilog__(self):
         return epilog()

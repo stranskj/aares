@@ -18,19 +18,106 @@ import numpy as np
 import math
 import PIL.Image
 import PIL.ImageOps
+import freephil as phil
+
+
+phil_core = phil.parse('''
+file = None
+.help = File with a custom mask. It can be mask in H5-file, or PNG (than is equvalent to custom.file). If this is H5 or H5Z data file, pixel_mask is extracted.
+
+output = mask.png
+.help = Output mask for further usage. It can be of H5 or PNG format
+
+beamstop 
+    .help = Automatic beamstop masking. The beamstop is expected to be tilted rectangle with half-circle top.
+{
+    size = 0
+    .type = float
+    .help = Size of beamstop for automatic mask in millimeters. Set to 0, if no beamstop masking is required
+    .expert_level = 0
+    
+    tilt = 0
+    .type = float
+    .help = Angular offset of the beamstop from a vertical line in degrees. For SAXSpoint 2.0, vertical position is 8 degrees, this value is then the difference from 8.
+    
+    origin = None
+    .type = ints(size = 2)
+    .help = Center of the beamstop in pixels. If None, primary beam position is used. 
+    
+    semitransparet = False
+    .help = Set true, if semitransparent beamstop is used. If true, beamstop mask created separately.
+    .type = bool
+}
+
+custom
+    .help = Custom made mask stored as PNG image. The image has to have pixel-to-pixel size with the detector. A template image can be generated using ares.draw2d
+    {
+    file = None
+    .help = File name
+    .type = path
+    
+    channel = R G B *A
+    .type = choice
+    .help = Image channel to be extracted as a mask
+    
+    threshold = 128
+    .type = int
+    .help = If value is higher than the threshold, the pixel is masked out.
+    } 
+    
+pixel_mask = True
+    .help = Use pixel mask from data files
+    .expert_level = 1
+    .type = bool    
+
+detector
+.help = Masking parameters related to the detector
+{
+   
+    chip_borders = True
+    .help = Exclude border pixels of the chips
+    .type = bool
+    
+    type = *None 'Eiger R 1M' custom
+    .help = Specify type of the detector. If None, read from file header. If custom, specify excluded_lines and invalid_pixels.
+    .type = choice
+
+    invalid_pixels
+    .help= Threshold limits, in which pixels are considered valid
+    .expert_level = 1
+    {
+        min = 0
+        .type = int
+        max = None
+        .type = int
+    }
+    
+    excluded_lines
+    .help = lines to be excluded during processing. For example, pixels on chip borders.
+    .expert_level = 1
+    {
+        rows = None
+        .type = ints
+        columns = None
+        .type = ints
+    }
+}
+''')
+
 
 detectors = {
     'Eiger R 1M' : {
         'shape' : (1065,1030),   # X,Y size of detector
-        'Y-mask' : [
+        'y_mask' : [
             255,256,257,258,
             513,514,515,516,
             771,772,773,774
                      ],
-        'X-mask' : [
+        'x_mask' : [
             255,256,257,258,
             806,807,808,809
                      ],
+        'range' : (0, int(math.pow(2,31)))
     }
 }
 
@@ -72,26 +159,28 @@ def rough_beamstop(beam_xy, frame_size, beamstop_pixel_radius):
     final_mask = np.logical_and(np.logical_or(stick_x, stick_y), circle)
     return final_mask
 
-def detector_chip_mask(det_type):
+def detector_chip_mask(shape = None, x_mask= [], y_mask = [], det_type = None):
     '''
     Generates mask of pixels on chip boundaries
-
-    TODO: User configurable?
 
     :param det_type: A detector from list "Detectors"
     :return: numpy array of booleans
     '''
 
-    try:
-        detector = detectors[det_type]
-    except KeyError:
-        raise ares.RuntimeErrorUser('Unknown detector type: {}\nAvailable types: {}'.format(det_type, list(detectors.keys())))
+    if det_type is not None:
+        try:
+            detector = detectors[det_type]
+            shape = detector['shape']
+            x_mask = detector['x_mask']
+            y_mask = detector['y_mask']
+        except KeyError:
+            raise ares.RuntimeErrorUser('Unknown detector type: {}\nAvailable types: {}'.format(det_type, list(detectors.keys())))
 
-    mask = np.ones(detector['shape'],dtype=bool)
+    mask = np.ones(shape,dtype=bool)
 
-    for x in detector['X-mask']:
+    for x in x_mask:
         mask[x] = False
-    for y in detector['Y-mask']:
+    for y in y_mask:
         mask[:,y] = False
 
     return mask
