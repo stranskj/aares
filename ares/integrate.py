@@ -75,7 +75,7 @@ def integrate(frame_arr, bin_masks):
     Calculate averages and stedevs across frames in all bins
     :param frame_arr: data; 3d np.array
     :param bin_masks: bin masks
-    :return: np.array, np. array: averges and stdevs
+    :return: np.array, np. array, np.array: averages, stddevs, number of points in bin
     '''
 
     no_frame = frame_arr.shape[0]
@@ -92,8 +92,8 @@ def integrate(frame_arr, bin_masks):
             stdev.append(numpy.nan)
         else:
             averages.append(numpy.nanmean(binval,dtype='float64'))
-            stdev.append(numpy.nanstd(binval,dtype='float64')/math.sqrt(binval.size))
-          #  stdev.append(numpy.sqrt(averages[-1])/math.sqrt(binval.size))
+          #  stdev.append(numpy.nanstd(binval,dtype='float64')/math.sqrt(binval.size))
+            stdev.append(numpy.sqrt(averages[-1])/math.sqrt(binval.size))
         num.append(binval.size)
 
     #int_masks = [numpy.array([msk]*no_frame) for msk in bin_masks]
@@ -110,7 +110,7 @@ def integrate(frame_arr, bin_masks):
 
 def integrate_mp(frame_arr, bin_masks, nproc=None):
     '''
-    Calculate averages and stedevs across frames in all bins, parallel in multiple chunks
+    Calculate averages and stddevs across frames in all bins, parallel in multiple chunks
     :param frame_arr: data; 3d np.array
     :param bin_masks: bin masks
     :return: np.array, np. array: averges and stdevs
@@ -138,12 +138,13 @@ def test():
     import ares.mask as am
     import ares.mask as mask
 
-    fin = '../data/10x60s_826mm_010Frames.h5'
-
+   # fin = '../data/10x60s_826mm_010Frames.h5'
+    fin = '../data/W_826mm_005Frames.h5z'
+   # fin = '../data/AgBeh_826mm.h5z'
     h5hd = h5z.SaxspointH5(fin)
 
-    frame_mask = numpy.logical_and(am.read_mask_from_image('frame_alpha_mask_180.png',channel='A',invert=True),
-                                   am.detector_chip_mask('Eiger R 1M'))
+    frame_mask = numpy.logical_and(am.read_mask_from_image('frame_alpha_mask.png',channel='A',invert=True),
+                                   am.detector_chip_mask(det_type='Eiger R 1M'))
 
     t0 = time.time()
     arrQ = qt.transform_detector_radial_q(h5hd)
@@ -155,13 +156,23 @@ def test():
     print(time.time() - t0)
 
     with h5z.FileH5Z(fin) as h5f:
-        avr, std, num = integrate_mp(h5f['entry/data/data'][:], q_masks)
+        frames = h5f['entry/data/data'][:]
+        avr, std, num = integrate_mp(frames, q_masks)
     print(time.time() - t0)
 
     with open('data_826.dat','w') as fout:
         for q, I, s in zip(q_vals,avr, std):
             fout.write('{},{},{}\n'.format(q,I,s))
 
+    import ares.statistics as stats
+    import ares.draw2d as draw2d
+
+    q_averages = stats.averages_to_frame_bins(q_masks, avr)
+    q_stdevs = stats.averages_to_frame_bins(q_masks, std)
+    draw2d.draw(q_averages,'frame_averages.png',Imax=1)
+
+    relative_dev_pix = stats.local_relative_deviation(frames[0], q_averages, window=15)
+    draw2d.draw(relative_dev_pix,'pix_dev.png', Imax=3, Imin=-3, cmap='PiYG')
 
 
  #   mask.draw_mask(q_masks[10],'q_mask10.png')

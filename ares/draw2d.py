@@ -19,7 +19,7 @@ import PIL.ImageOps
 import matplotlib.cm
 import h5z
 
-def draw(frame, fiout, Imax= '2*median', Imin=0):
+def draw(frame, fiout, Imax= '2*median', Imin=0, cmap='jet'):
     '''
     Draws frame to a file
 
@@ -40,7 +40,9 @@ def draw(frame, fiout, Imax= '2*median', Imin=0):
             elif splited[-1] == 'average':
                 val = numpy.average(frame)
             elif splited[-1] == 'max':
-                val = numpy.max(frame)
+                val = numpy.nanmax(frame)
+            elif splited[-1] == 'min':
+                val = numpy.nanmin(frame)
             else:
                 raise AttributeError('Unknown parameter: {}'.splited[-1])
 
@@ -66,7 +68,7 @@ def draw(frame, fiout, Imax= '2*median', Imin=0):
     }
 
 
-    colormap = matplotlib.cm.get_cmap('jet')
+    colormap = matplotlib.cm.get_cmap(cmap)
     #colormap.
     #img = PIL.Image.fromarray(numpy.uint8(matplotlib.cm.gist_earth(normalized)*255))
 
@@ -81,7 +83,10 @@ def draw(frame, fiout, Imax= '2*median', Imin=0):
 
 def test():
     with h5z.FileH5Z('../data/AgBeh_826mm.h5z') as h5f:
-        draw(h5f['entry/data/data'][0],'frame.png','0.5*max')
+        draw(numpy.log10(h5f['entry/data/data'][0]+1),'frame.png',5)
+
+    with h5z.FileH5Z('../data/W_826mm_005Frames.h5z') as h5f:
+        draw(numpy.average(h5f['entry/data/data'],axis=0),'beam.png',1)
 
 def main():
     test()
