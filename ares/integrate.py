@@ -138,13 +138,15 @@ def test():
     import ares.mask as am
     import ares.mask as mask
 
-   # fin = '../data/10x60s_826mm_010Frames.h5'
-    fin = '../data/W_826mm_005Frames.h5z'
+    fin = '../data/10x60s_826mm_010Frames.h5'
+  #  fin = '../data/W_826mm_005Frames.h5z'
    # fin = '../data/AgBeh_826mm.h5z'
     h5hd = h5z.SaxspointH5(fin)
 
     frame_mask = numpy.logical_and(am.read_mask_from_image('frame_alpha_mask.png',channel='A',invert=True),
-                                   am.detector_chip_mask(det_type='Eiger R 1M'))
+                                  am.detector_chip_mask(det_type='Eiger R 1M'))
+
+    #frame_mask = am.read_mask_from_image('frame_alpha_mask.png',channel='A',invert=True)
 
     t0 = time.time()
     arrQ = qt.transform_detector_radial_q(h5hd)
@@ -162,17 +164,27 @@ def test():
 
     with open('data_826.dat','w') as fout:
         for q, I, s in zip(q_vals,avr, std):
-            fout.write('{},{},{}\n'.format(q,I,s))
+            fout.write('{} {} {}\n'.format(q,I,s))
 
     import ares.statistics as stats
     import ares.draw2d as draw2d
 
-    q_averages = stats.averages_to_frame_bins(q_masks, avr)
-    q_stdevs = stats.averages_to_frame_bins(q_masks, std)
-    draw2d.draw(q_averages,'frame_averages.png',Imax=1)
+  #  q_averages = stats.averages_to_frame_bins(q_masks, avr)
+  #  q_stdevs = stats.averages_to_frame_bins(q_masks, std)
+  #  draw2d.draw(q_averages,'frame_averages.png',Imax=1)
 
-    relative_dev_pix = stats.local_relative_deviation(frames[0], q_averages, window=15)
-    draw2d.draw(relative_dev_pix,'pix_dev.png', Imax=3, Imin=-3, cmap='PiYG')
+   # relative_dev_pix = stats.local_relative_deviation(frames[0], q_averages, window=15)
+   # draw2d.draw(relative_dev_pix,'pix_dev.png', Imax=3, Imin=-3, cmap='PiYG')
+
+    cc12 = []
+    bin_sz = 5
+    for chnk in pwr.chunks(q_masks,bin_sz):
+        cc12.append(stats.set_cc12(frames[0],chnk))
+
+    with open('cc12.dat','w') as fout:
+        for i, cc in zip(range(int(750/bin_sz)),cc12):
+            fout.write('{} {}\n'.format(q_vals[bin_sz*i],cc))
+
 
 
  #   mask.draw_mask(q_masks[10],'q_mask10.png')

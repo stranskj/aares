@@ -83,7 +83,54 @@ def sliding_average_frame(frame, window):
     avr = numpy.nanmean(arrays_window,axis=(2,3))
     return avr
 
+def set_cc12(dataset, qbins):
+    '''
+    Returns CC1/2 for the dataset
 
+    :param dataset:
+    :return: float
+    '''
+
+    half1 = []
+    half2 = []
+
+    for bin in qbins:
+        h1 = []
+        h2 = []
+        for i in range(10):  # Calculate for 10 different splits and average
+            splited = random_sets(dataset[bin],2)
+            if (len(splited[0]) > 0) and (len(splited[1]) > 0):
+                h1.append(numpy.nanmean(splited[0]))
+                h2.append(numpy.nanmean(splited[1]))
+            else:
+                h1.append(numpy.nan)
+                h2.append(numpy.nan)
+
+        half1.append(numpy.nanmean(h1))
+        half2.append(numpy.nanmean(h2))
+
+    cc12 = numpy.corrcoef(numpy.array(half1),numpy.array(half2))[0,1]
+    return cc12
+
+def random_sets(dataset, nsets):
+    '''
+    Returns random split of the dataset
+
+    :param dataset:
+    :param nsets: number of sets to the dataset to be devided into
+    :return: list of bool arrays
+    '''
+    indicies = numpy.random.permutation(dataset.flatten())
+    chunks = numpy.array_split(indicies,nsets)
+
+    subset_masks = []
+
+  #  for chnk in chunks:
+   #     arr = numpy.full(dataset.shape, False)
+    #    arr[chnk] = True
+     #   subset_masks.append(arr)
+
+    return chunks
 
 
 def rolling_window(array, window=(0,), asteps=None, wsteps=None, axes=None, toend=True):
@@ -266,8 +313,9 @@ def test():
 
    # avr = numpy.average(slwnd,axis=(2,3))
 
-    avr = sliding_average_frame(frames[0],window=5)
-    pass
+ #   avr = sliding_average_frame(frames[0],window=5)
+    cc12 = set_cc12(frames)
+    print(cc12)
 
 def main():
     test()
