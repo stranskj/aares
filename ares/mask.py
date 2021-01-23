@@ -13,19 +13,29 @@ Creating masks
 """
 
 import ares
+import logging
+
+__all__ = []
+__version__ = ares.__version__
+prog_short_description = 'Generates frame mask'
 
 import numpy as np
 import math
 import PIL.Image
 import PIL.ImageOps
 import freephil as phil
+import h5z
 
 
 phil_core = phil.parse('''
 file = None
-.help = File with a custom mask. It can be mask in H5-file, or PNG (than is equvalent to custom.file). If this is H5 or H5Z data file, pixel_mask is extracted.
+.type = path
+#.multiple = True
+#.help = File with a custom mask. It can be mask in H5-file, or PNG (than is eqiuvalent to custom.file). If this is H5 or H5Z data file, pixel_mask is extracted.
+.help = File used to extract information about the experiment.
 
 output = mask.png
+.type = path
 .help = Output mask for further usage. It can be of H5 or PNG format
 
 beamstop 
@@ -36,7 +46,7 @@ beamstop
     .help = Size of beamstop for automatic mask in millimeters. Set to 0, if no beamstop masking is required
     .expert_level = 0
     
-    tilt = 0
+    tilt = None
     .type = float
     .help = Angular offset of the beamstop from a vertical line in degrees. For SAXSpoint 2.0, vertical position is 8 degrees, this value is then the difference from 8.
     
@@ -44,13 +54,14 @@ beamstop
     .type = ints(size = 2)
     .help = Center of the beamstop in pixels. If None, primary beam position is used. 
     
-    semitransparet = False
-    .help = Set true, if semitransparent beamstop is used. If true, beamstop mask created separately.
-    .type = bool
+    semitransparent = None
+    .help = Hole cut-out in the mask for primary, in case semitransparent beamstop was used. Pick slightly smaller number than beamstop size.
+    .type = float
 }
 
 custom
     .help = Custom made mask stored as PNG image. The image has to have pixel-to-pixel size with the detector. A template image can be generated using ares.draw2d
+    .multiple = True
     {
     file = None
     .help = File name
@@ -92,7 +103,7 @@ detector
         .type = int
     }
     
-    excluded_lines
+    exclude_lines
     .help = lines to be excluded during processing. For example, pixels on chip borders.
     .expert_level = 1
     {
@@ -121,7 +132,25 @@ detectors = {
     }
 }
 
-def rough_beamstop(beam_xy, frame_size, beamstop_pixel_radius):
+def beamstop_hole(beam_xy, hole_pixel_radius, beamstop_mask):
+    '''
+    Creates hole in beamstop mask for semitransparent beamstops
+
+    :param beam_xy:
+    :param frame_size:
+    :param hole_pixel_radius:
+    :return:
+    '''
+
+    i = np.arange(beamstop_mask.shape[0])
+    j = np.arange(beamstop_mask.shape[1])
+    I, J = np.meshgrid(j, i)
+
+    circle = (I - beam_xy[0]) ** 2 + (J - beam_xy[1]) ** 2 < hole_pixel_radius ** 2
+
+    return np.logical_or(beamstop_mask,circle)
+
+def rough_beamstop(beam_xy, frame_size, beamstop_pixel_radius, tilt = None):
     """
     Creates rough beamstop mask based on position of beam and beamstop size (does not account for poteintialy rectangular pixels)
 
@@ -254,16 +283,165 @@ def combine_masks(*list_of_masks):
 
     return out_mask
 
+def composite_mask(work_phil, file_header=None):
+    '''
+    Produces composite mask based on input
+
+    :param work_phil: input parameters
+    :type work_phil: phil.extract
+    :param file_header: File header to get the experimental information
+    :return:
+    '''
+
+    import os
+
+    masks = []
+
+    # Get file header
+    if (work_phil.file is not None) and (file_header is None):
+        try:
+            file_header = h5z.SaxspointH5(work_phil.file)
+        except OSError:
+            raise ares.RuntimeErrorUser('Wrong file format. Please provide data file.')
+
+    if file_header is None:
+        raise ares.RuntimeErrorUser('Missing file header. Please provide a data file.')
+
+
+    # Pixel mask from the file
+    if work_phil.pixel_mask:
+        ares.my_print('Extracting pixel mask from the datafile...')
+        masks.append(pixel_mask = pixel_mask_from_file(file_header))
+
+    # Masks from PNG files
+    for msk in work_phil.custom:
+        ares.my_print('Creating mask from file {}'.format(msk.file))
+        masks.append(read_mask_from_image(msk.file,msk.channel,msk.treshold))
+
+    # Chip borders
+    if work_phil.detector.chip_borders:
+        ares.my_print('Creating mask for chip borders...')
+        if work_phil.detector.type == 'None':
+            detector_type = file_header['entry/instrument/detector/description'].item().decode()
+        else:
+            detector_type = work_phil.detector.type
+
+        if detector_type == 'custom':
+            ares.my_print('Custom detector type. Excluding:')
+            if work_phil.detector.exclude_lines.rows is None:
+                logging.warning('No pixel row defined to be excluded')
+            else:
+                ares.my_print('Rows:    '+', '.join(work_phil.detector.exclude_lines.rows))
+            if work_phil.detector.exclude_lines.columns is None:
+                logging.warning('No pixel column defined to be excluded')
+            else:
+                ares.my_print('Columns: '+', '.join(work_phil.detector.exclude_lines.rows))
+
+            detector_type = None
+
+        masks.append(detector_chip_mask(
+            file_header.frame_size,
+            work_phil.detector.exclude_lines.rows,
+            work_phil.detector.exclude_lines.columns,
+            detector_type
+            ))
+
+    # Beamstop
+
+    if work_phil.beamstop.size > 0:
+        ares.my_print('Creating beamstop mask...')
+        if work_phil.beamstop.origin is not None:
+            origin = work_phil.beamstop.origin
+        else:
+            origin = file_header.beam_center_px
+
+        beamstop_mask = rough_beamstop(
+            beam_xy=origin,
+            frame_size=file_header.frame_size,
+            beamstop_pixel_radius=work_phil.beamstop.size/file_header.pixel_size[0]/2000,
+            tilt=work_phil.beamstop.tilt
+            )
+
+        if work_phil.beamstop.semitransparent is not None:
+            ares.my_print('Applying cut-out for transparent beamstop...')
+            beamstop_mask = beamstop_hole(
+                beam_xy=origin,
+                hole_pixel_radius=work_phil.beamstop.semitransparent/file_header.pixel_size[0]/2000,
+                beamstop_mask=beamstop_mask
+            )
+
+        masks.append(beamstop_mask)
+
+    ares.my_print('Merging masks...')
+    return combine_masks(*masks)
+
+class JobMask(ares.Job):
+    """
+    Run class based on generic Ares run class
+    """
+
+    def __set_meta__(self):
+        '''
+        Sets various package metadata
+        '''
+        import os, sys
+        self._program_short_description = prog_short_description
+
+        self._program_name = os.path.basename(sys.argv[0])
+        self._program_version = __version__
+
+    def __worker__(self):
+        '''
+        The actual programme worker
+        :return:
+        '''
+        mask = composite_mask(self.params)
+
+        ares.my_print('Saving the mask in the file: {}'.format(self.params.output))
+        draw_mask(mask,self.params.output)
+
+    def __set_system_phil__(self):
+        '''
+        Settings of CLI arguments. self._parser to be used as argparse.ArgumentParser()
+        '''
+        self._system_phil = phil_core
+
+    def __argument_processing__(self):
+        '''
+        Adjustments of raw input arguments. Modifies self._args, if needed
+
+        '''
+        pass
+
+    def __help_epilog__(self):
+        '''
+        Epilog for the help
+
+        '''
+        pass
+
+
+
 def test():
 #    mask = detector_chip_mask('Eiger R 1M')
 #    draw_mask(mask,'chip_mask.png')
-    mask = read_mask_from_image('frame_alpha_mask.png', 'A')
+#    mask = read_mask_from_image('frame_alpha_mask.png', 'A')
 
-    draw_mask(mask,'test_mask.png')
+    test_phil = phil.parse('''
+    pixel_mask = False
+    file = ../data/10x60s_826mm_010Frames.h5
+    ''')
+
+    work_phil = phil_core.fetch(test_phil)
+    work_extract = work_phil.extract()
+    composite_mask(work_extract)
+    pass
+#    draw_mask(mask,'test_mask.png')
 
 
 def main():
-    test()
+    job = JobMask()
+    return job.job_exit
 
 if __name__ == '__main__':
     main()

@@ -277,6 +277,12 @@ class SaxspointH5():
         y = -det[1] / pix[1]
 
         return x, y
+    @property
+    def frame_size(self):
+        '''
+        Shape of the frame
+        '''
+        return self['entry/instrument/detector/pixel_mask'].shape
 
     @property
     def sdd(self):

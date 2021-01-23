@@ -188,10 +188,11 @@ USAGE
                                   action='version',
                                   version=program_version_message)
             self._parser.add_argument('-c','--show-config',
-                                      action='store_true',
-                                      default=False,
+                                      nargs='?',
+                                      const='True',
+                                      default=None,
                                       dest='show_config',
-                                      help='Show the configuration parameters.')
+                                      help='Show the configuration parameters. If file name is provided, generates PHIL file')
             self._parser.add_argument('-a','--attributes-level',
                                       default=0,
                                       type=int,
@@ -300,7 +301,7 @@ USAGE
             self.__parse_arguments__()
             self.__intro__()
 
-            if self._args.show_config:
+            if self._args.show_config is not None:
                 print(
                 "Showing configuration parameters with:\n"
                 "  attributes_level = %d\n"
@@ -313,6 +314,17 @@ USAGE
                         attributes_level=self._args.attributes_level,
                     )
                 )
+                if not (self._args.show_config == 'True'):
+                    print('Writing to file: {}'.format(self._args.show_config))
+                    try:
+                        with open(self._args.show_config, 'w') as conf_out:
+                            self.system_phil.show(
+                                conf_out,
+                                expert_level=self._args.expert_level,
+                                attributes_level=self._args.attributes_level,)
+                    except:
+                        raise RuntimeErrorUser('Cannot write to file {}'.format(self._args.show_config))
+
                 self.job_exit = 0
                 return
 
