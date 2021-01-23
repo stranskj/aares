@@ -71,6 +71,10 @@ custom
     .type = choice
     .help = Image channel to be extracted as a mask
     
+    invert = False
+    .type = bool
+    .help = Invert the resulting mask
+    
     threshold = 128
     .type = int
     .help = If value is higher than the threshold, the pixel is masked out.
@@ -316,7 +320,24 @@ def composite_mask(work_phil, file_header=None):
     # Masks from PNG files
     for msk in work_phil.custom:
         ares.my_print('Creating mask from file {}'.format(msk.file))
-        masks.append(read_mask_from_image(msk.file,msk.channel,msk.treshold))
+
+        if msk.file is None:
+            #TODO: Is there actually a way to fix it in Freephil?
+            raise ares.RuntimeErrorUser(''''Incomplete definition, parameter 'custom.file' is missing.
+             
+HINT: If you are specifying more parameters for custom mask, please use a PHIL file as an input, which contains following for each custom mask:
+
+custom {
+  file=
+  inverted = 
+  channel =
+  threshold = 
+  }
+  ''')
+        masks.append(read_mask_from_image(msk.file,
+                                          msk.channel,
+                                          msk.threshold,
+                                          msk.invert))
 
     # Chip borders
     if work_phil.detector.chip_borders:
