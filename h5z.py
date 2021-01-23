@@ -44,6 +44,20 @@ def FileH5Z(name, file_mode='r', *args, **kwargs):
     finally:
         pass
 
+def is_h5_file(name):
+    '''
+    Chekcs, if the file is readable h5 or h5z readable file
+    :param name: File name
+    :type name: str
+    :rtype: bool
+    '''
+
+    try:
+        with FileH5Z(name, 'r') as h5f:
+            return True
+    except OSError:
+        return False
+
 
 def _report(operation, key, obj):
     type_str = type(obj).__name__.split(".")[-1].lower()
