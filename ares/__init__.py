@@ -330,6 +330,9 @@ USAGE
 
             self.phil_argument_processing(self._args.phil_arguments)
 
+            my_print('User input understanding:\n')
+            my_print(self.system_phil.fetch_diff(self._phil).as_str())
+
             start_t = time.time()
             self.__worker__()
             el_time = time.time() - start_t
