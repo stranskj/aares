@@ -3,6 +3,89 @@ import numpy
 import math
 import copy
 import ares.power as pwr
+import ares
+import freephil as phil
+
+phil_core = phil.parse('''
+units = *nm A
+.type = choice
+.help = 'Units to be used. The length of scattering vector (:math:`q`) is calculated as :math:`4\pi*sin \\theta/\lambda` in inverse units of choice.'
+
+origin = None
+.type = ints(2)
+.help = Beam position at the detector in pixels
+''')
+
+def get_item_and_type(data):
+    '''
+    Extracts a value from single-item dataset, and type as string
+    :param data:
+    :return: value, type
+    '''
+
+    dat_item = data.item()
+    if data.dtype.kind in ['U', 'S']:
+        value = dat_item.decode()
+        val_type = 'str'
+    else:
+        value = dat_item
+        val_type = type(value).__name__
+
+    return value, val_type
+
+def dataset_to_scope(dataset, name = None, **kwargs):
+    '''
+    Converts DatasetH5 into PHIL scope
+    :param dataset:
+    :return:
+    '''
+
+    if name is None:
+        name = dataset.name
+
+    if dataset.size > 1:
+        value = 'long array, skipped'
+    else:
+        value, val_type = get_item_and_type(dataset)
+
+    value_definition = phil.definition('value',
+                            ["{}".format(value)],
+                            type=val_type,
+                            help='Parameter value')
+    attrs_objects = []
+    for key,attr in dataset.attrs.items():
+        val, val_type = get_item_and_type(attr)
+        attrs_objects.append(phil.definition(key,[val], type=val_type))
+
+    attributes_scope = phil.scope('attrs',
+                                  objects = attrs_objects,
+                                  help='Parameter attributes')
+
+    return phil.scope(name,
+                      objects=[value_definition, attributes_scope],
+                      **kwargs)
+
+def extract_geometry_to_phil(header, name='detector', parent='/entry/instrument/detector', skip=['time','x_pixel_offset','y_pixel_offset', 'pixel_mask', 'geometry']):
+    '''
+    Extract geometry information from the header to a PHIL scope
+    :param header:
+    :param parent:
+    :return:
+    '''
+
+    detector = header[parent]
+
+    objects = []
+
+    for key, val in detector.items():
+        if key in skip:
+            continue
+        if  isinstance(val, h5z.DatasetH5):
+            objects.append(dataset_to_scope(val,key))
+
+    return phil.scope(name,
+                      objects)
+
 
 def rotate_by_axis_matrix(axis, angle):
     '''
@@ -120,7 +203,9 @@ def get_q(XYZ, beam_vec, wavelength = 1):
 
 def transform_detector_radial_q(header, beam = (0,0,1), unit='nm'):
     '''
-    Perform q-transformation of the detector based on the header. Size of q-vector is returned for each pixel in an array coresponding to the frame.
+    Perform q-transformation of the detector based on the header.
+    Length of q-vector is returned for each pixel in an array coresponding to the frame.
+
     :param header: SaxspointH5 File header
     :return: numpy.array of frame dimensions
     '''
