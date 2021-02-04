@@ -19,6 +19,51 @@ import math
 import ares.power as pwr
 import concurrent.futures
 import os
+import freephil as phil
+
+phil_core_str ='''
+    bins_number = 0
+    .type = int
+    .expert_level = 0
+    .help = Number of bins to which data are devided. If 0, determined automatically.
+    
+    q_range = 0 0
+    .type = floats(2)
+    .expert_level = 0
+    .help = Q range to be used for the reduction
+   
+    beam_normalize
+    .help = Adjust data for beam variation. Pick one of the options q_range or real_space. If 0, it is not used. 
+    {
+        q_range = 0 0
+        .type = floats(2)
+        .expert_level = 0
+        .help = Adjust to the mean within the q-range. For example, it can be used for backgraound normalization.
+        
+        real_space = 0 0
+        .type = floats(2)
+        .expert_level = 0
+        .help = Adjust to the mean within the real distance on the detector. Useful for normalization using semi-transparent beamstop: use balue slightly smaller than the beamstop size
+        
+        beamstop_transmission = 1
+        .type = float
+        .expert_level = 1
+        .help = Transmission constant of the semitransparent beamstop.
+    }
+     
+'''
+
+phil_core = phil.parse(phil_core_str)
+
+phil_job_core = phil.parse('''
+    input.file_name = None
+    .multiple = True
+    .type = path
+    
+    reduction  {
+    '''+ phil_core_str+'''
+    }
+''', process_includes=True)
 
 def create_bins(qmin, qmax, bins):
     '''
