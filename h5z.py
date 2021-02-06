@@ -129,6 +129,46 @@ def recompress(path1, path2, log=False, compression='gzip'):
         walk(in_file, out_file, log=log, compression=compression)
     return os.stat(path1).st_size, os.stat(path2).st_size
 
+def groupH5_to_scope(group):
+    '''
+
+    :param group:
+    :return:
+    '''
+    pass
+
+def datasetH5_to_scope(dataset, max_length=20):
+    '''
+    Converts DatasetH5 or h5py.dataset to PHIL scope.
+
+    Conversion:
+    name is name
+    attributes -> subscope called "attributes"
+    actual value -> subdefinition called "value". If the array is longer than `max_length`, only shape of the array is stored. If `None`, store everything.
+    attribute `long_name` -> .help
+    value type -> translates to value/.type
+
+    :param dataset:
+    :return:
+    '''
+
+
+def h5_to_phil(header):
+    '''
+    Converts H5-like structure to PHIL scope
+    :param header:
+    :rtype: phil.scope
+    '''
+
+
+def phil_to_h5(scope):
+    '''
+    Converts PHIL scope to H5-like structure
+    :param scope: Input data
+    :type scope:  phil.scope
+    :rtype: GroupH5
+    '''
+    pass
 
 class DatasetH5(np.ndarray):
     """
@@ -153,6 +193,18 @@ class DatasetH5(np.ndarray):
             for key, val in source_dataset.attrs.items():
                 self.attrs[key] = copy.copy(val)
             self.name = source_dataset.name
+
+    def __eq__(self, other):
+        if not (isinstance(other, DatasetH5) or isinstance(other,h5py.Dataset)):
+            # don't attempt to compare against unrelated types
+            return NotImplemented
+        attr_bool = len(self.attrs) == len(other.attrs)
+        for key, val in self.attrs.items():
+            try:
+                attr_bool = attr_bool and (val==other.attrs[key])
+            except KeyError:
+                attr_bool = False
+        return  attr_bool and np.array_equal(self, other[:],equal_nan=True)
 
 
 class GroupH5(dict):
@@ -198,6 +250,20 @@ class GroupH5(dict):
                 return self[split_key[0]][split_key[1]]
         except KeyError:
             raise KeyError('Entry does not exsist: {}'.format(key))
+
+    def __eq__(self, other):
+        if not (isinstance(other, GroupH5) or isinstance(other,h5py.Group)):
+            # don't attempt to compare against unrelated types
+            return NotImplemented
+        attr_bool = len(self.attrs) == len(other.attrs)
+        for key, val in self.attrs.items():
+            try:
+                attr_bool = attr_bool and (val==other.attrs[key])
+            except KeyError:
+                attr_bool = False
+
+        return  super().__eq__(other) and attr_bool
+
 
 
 class SaxspointH5():
@@ -314,6 +380,35 @@ class SaxspointH5():
 
         return tm[:26] + tm[27:]
 
+def test_equal_Datasets():
+    f1 = 'data/10x1s.h5'
+    header = SaxspointH5(f1)
+    dataset1 = header['entry/data/sdd']
+
+    f2 = 'data/10x1s.h5'
+    header = SaxspointH5(f2)
+    dataset2 = header['entry/data/sdd']
+    assert dataset1 == dataset2
+
+def test_equal_Groups():
+    f1 = 'data/10x1s.h5'
+    header = SaxspointH5(f1)
+    header1 = header['entry/sample']
+
+    f2 = 'data/10x1s.h5'
+    header = SaxspointH5(f2)
+    header2 = header['entry/sample']
+
+    with FileH5Z(f1,'r') as h5z1, FileH5Z(f2,'r') as h5z2:
+
+        dc1 = h5z1['entry/sample']
+        dc2 = h5z2['entry/sample']
+
+        assert header2 == dc1
+    #header1 = SaxspointH5('data/10x1s.h5')
+    #header2 = SaxspointH5('data/10x1s.h5')
+
+    assert header1 == header2
 
 def test_DatasetH5():
     a = np.full(1, np.nan)
@@ -322,4 +417,5 @@ def test_DatasetH5():
 
 
 if __name__ == "__main__":
-    test_DatasetH5()
+    test_equal_Datasets()
+    test_equal_Groups()
