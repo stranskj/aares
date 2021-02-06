@@ -3,6 +3,7 @@ Common "power" features for Ares
 '''
 
 import multiprocessing
+import sys
 
 import numpy as np
 
@@ -48,3 +49,25 @@ def chunks(lst, n):
     """Yield successive n-sized chunks from lst."""
     for i in range(0, len(lst), n):
         yield lst[i:i + n]
+
+def mp_worker(func, *args, **kwargs):
+    '''
+    Worker for multiprocessing (concurrent.futures etc.) with KeyboardInterrupt handling
+
+    :param func:
+    :param args:
+    :param kwargs:
+    :return:
+    '''
+    try:
+        result = func(*args, **kwargs)
+    except KeyboardInterrupt:
+        print('Keyboard interupt recieved, exiting...')
+        sys.exit('Keyboard interupt, exited.')
+    except ChildProcessError as e:
+        print('Child processes shut down.')
+        # print(e)
+        raise ChildProcessError(e)
+    finally:
+        pass
+    return result
