@@ -4,3 +4,6 @@
 
 * In main Job class, revisit untracked/unused parameters.
   * It will conflict with the Major PHIL file used in sub-jobs
+
+* Generic job-control Phil entry to __init__
+  * nproc

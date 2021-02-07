@@ -290,6 +290,16 @@ USAGE
         # Extract the parameters
         self.params = self._phil.extract()
         self.unhandled = unhandled
+        self.__process_unhandled__()
+        self._phil = self.system_phil.format(self.params)
+
+    def __process_unhandled__(self):
+        '''
+        Process unhandled CLI arguments into self.params
+
+        :return:
+        '''
+        pass
 
     def __run__(self,*args,**kwargs):
         '''

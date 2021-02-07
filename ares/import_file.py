@@ -21,6 +21,10 @@ prog_short_description = 'Finds and import the data files'
 
 import h5z
 import freephil as phil
+import glob
+import os
+import itertools
+import ares.power as pwr
 
 phil_files = phil.parse('''
 group 
@@ -65,8 +69,13 @@ search_string = None
 .multiple = True
 .type = str
 
+suffix = h5z h5
+.help = Suffixes to search for. HDF5 files are used by the software.
+
+
 output = files.phil
-.help = 
+.help = PHIL file with description of the imported files and file groups.
+.type = path
 
 name_from = None sample *file_name
 .help = How to generate name of the file
@@ -81,6 +90,86 @@ prefix = None *time file_name
 .type = choice
 
 ''')
+
+def group_object(files = []):
+    '''
+    Returns empty Group scope_extract
+    :return:
+    '''
+
+    pe = phil_files.extract()
+    gr = pe.group.pop()
+    gr.file.pop()
+
+    gr.file.extend(files)
+
+    return gr
+
+def file_object(path = None, name = None):
+    '''
+    Returns empty File scope_extract
+    :return:
+    '''
+
+    pe = phil_files.extract()
+    fo = pe.group[0].file.pop()
+    fo.path = path
+    fo.name = name
+    return fo
+
+def search_files(indir, suffix):
+    fiout = []
+    for root, dirs, files in os.walk(indir):
+        for file in files:
+            if file.endswith(suffix):
+                fiout.append(os.path.join(root, file))
+    return fiout
+
+def get_files(inpaths, suffixes):
+    if isinstance(suffixes, str):
+        suffixes = [suffixes]
+
+    for i,suf in enumerate(suffixes):
+        if not(suf[0] == '.'):
+            suffixes[i] = '.'+suf
+
+    files = [[file for file in glob.glob(fi)] for fi in inpaths]
+    inpaths = [fi for fi in itertools.chain.from_iterable(files)]
+    file_list = []
+    for fi in inpaths:
+        if os.path.isdir(fi):
+            for suf in suffixes:
+                file_list.extend(search_files(fi, suf))
+        else:
+            file_list.append(fi)
+    return file_list
+
+def files_to_groups(files, headers_to_match = 'entry/instrument/detector'):
+    '''
+    Split the files in the groups based on common headers.
+    :param files: list of files to be distributed
+    :return:
+    '''
+    groups = []
+    if isinstance(headers_to_match,str):
+        headers_to_match = [headers_to_match]
+
+    if not isinstance(files,dict):
+        files = pwr.get_headers_dict(files)
+
+
+    for fi, hd in files.items():
+        file_scope = file_object(path=fi)
+
+        for group in groups:
+            if all(hd[match] == files[group.file[0].path][match] for match in headers_to_match):
+                group.file.append(file_scope)
+                break
+        else:
+            groups.append(group_object([file_scope]))
+
+
+    return groups
 
 class JobImport(ares.Job):
     """
@@ -103,6 +192,33 @@ class JobImport(ares.Job):
         :return:
         '''
 
+        pass
+        files = get_files(self.params.search_string, self.params.suffix)
+
+        saxspoint_geometry_fields =[
+            'entry/instrument/detector/depends_on',
+            'entry/instrument/detector/description',
+            'entry/instrument/detector/detector_number',
+            'entry/instrument/detector/distance',
+            'entry/instrument/detector/height',
+            'entry/instrument/detector/meridional_angle',
+            'entry/instrument/detector/sensor_material',
+            'entry/instrument/detector/sensor_thickness',
+            'entry/instrument/detector/x_pixel_offset',
+            'entry/instrument/detector/x_pixel_size',
+            'entry/instrument/detector/y_pixel_offset',
+            'entry/instrument/detector/y_pixel_size',
+            'entry/instrument/detector/x_translation',
+            'entry/instrument/monochromator',
+        ]
+
+        groups = files_to_groups(files, saxspoint_geometry_fields)
+        files_extract = phil_files.extract()
+        files_extract.group = groups
+        print(phil_files.format(files_extract).as_str(expert_level=0))
+
+        pass
+
 
     def __set_system_phil__(self):
         '''
@@ -116,6 +232,14 @@ class JobImport(ares.Job):
 
         '''
         pass
+
+    def __process_unhandled__(self):
+        '''
+        Process unhandled CLI arguments into self.params
+
+        :return:
+        '''
+        self.params.search_string.extend(self.unhandled)
 
     def __help_epilog__(self):
         '''

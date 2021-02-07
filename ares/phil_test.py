@@ -17,7 +17,16 @@ test.input = None
    .type = str
    .help = "testing input"  
    .expert_level = 3  
+
+
+paths = None
+    .type = str
+    .help = "Test"
+    .multiple=True
+
     '''
+
+
 )
 
 class JobTestPhil(ares.Job):
@@ -57,6 +66,14 @@ class JobTestPhil(ares.Job):
 
         '''
         pass
+
+    def __process_unhandled__(self):
+        '''
+        Process unhandled CLI arguments into self.params
+
+        :return:
+        '''
+        self.params.paths=self.unhandled
 
 def main(argv=None):
     job = JobTestPhil()

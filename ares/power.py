@@ -3,6 +3,7 @@ Common "power" features for Ares
 '''
 
 import multiprocessing
+import concurrent.futures
 import sys
 
 import numpy as np
@@ -71,3 +72,27 @@ def mp_worker(func, *args, **kwargs):
     finally:
         pass
     return result
+
+def get_headers(file_list, nproc=None, sort=None):
+    """
+    Returns list of headers in SaxspointH5 format, sorted by time
+    """
+    import h5z
+    with concurrent.futures.ProcessPoolExecutor(nproc) as ex:
+        headers = list(ex.map(mp_worker, [h5z.SaxspointH5]*len(file_list), file_list))
+
+    if sort is not None:
+        headers.sort(key=lambda x: x.attrs[sort])
+    return headers
+
+def get_headers_dict(file_list, nproc=None, sort=None):
+    '''
+    Returns dict of file headers, named by the file path
+
+    :param file_list:
+    :param nproc:
+    :param sort:
+    :return:
+    '''
+
+    return {fi : hd for fi, hd in zip(file_list, get_headers(file_list, nproc=nproc, sort=None))}
