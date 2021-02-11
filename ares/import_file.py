@@ -89,6 +89,9 @@ prefix = None *time file_name
 .help = Prefix the name enumerated by...
 .type = choice
 
+ignore_merged = True
+.help = Ignore files with merged frames. Using these diminish some of the Ares features. Moreover, no special handlig fo these is implemented, which can lead to unexpected results.
+.type = bool
 ''')
 
 def group_object(files = []):
@@ -171,6 +174,161 @@ def files_to_groups(files, headers_to_match = 'entry/instrument/detector'):
 
     return groups
 
+def is_merged(file_in):
+    '''
+    Checkes, whether the file is average of multiple frames
+    :param file_in: header or file name
+    :type  file_in: h5z.SaxspointH5 or string
+    :return:
+    '''
+
+    if isinstance(file_in,str):
+        try:
+            file_in = h5z.SaxspointH5(file_in)
+        except :
+            raise IOError('Wrong or missing file: {}'.format(file_in))
+
+    try:
+        file_in['entry/data/averaged_frames']
+        return True
+    except KeyError:
+        return False
+
+class ImportFiles:
+    '''
+    Handling class to control file imports
+
+    :ivar files_dict: Dictionary of read file headers. File path as a key.
+    :ivar file_groups: Files ordered into the groups (phil.scope_extract)
+    '''
+
+    def __init__(self, run_phil=None, file_phil=None):
+        '''
+        :param run_phil:
+        :type  run_phil: phil.scope_extract
+        :return: Returns a list of files separated to groups in format of `import_file.phil_file`
+        :rtype: phil.scope_extract
+        '''
+
+        assert (run_phil is not None) ^ (file_phil is not None)
+
+        self.files_dict = {}
+        self.file_groups = None
+
+        if run_phil is not None:
+            self.from_input_phil(run_phil)
+        elif file_phil is not None:
+            self.from_phil_file(file_phil)
+        else:
+            raise AssertionError('No argument given.')
+
+    def from_input_phil(self, phil_in):
+        """
+        Processes files using an input parameters in PHIL
+        :return:
+        """
+        files = get_files(phil_in.search_string, phil_in.suffix)
+        ares.my_print('Found {} files.'.format(len(files)))
+        self.files_dict = pwr.get_headers_dict(files)
+        groups = files_to_groups(self.files_dict)
+        self.file_groups = phil_files.extract()
+        self.file_groups.group = groups
+
+    def from_phil_file(self, phil_in):
+        """
+        Imports the description of groups from the PHIL file
+        :param phil_in: Input PHIL parameters
+        :type phil_in: string, phil.scope or phil.scope_exract
+        :return:
+        """
+
+        if isinstance(phil_in,str):
+            if os.path.isfile(phil_in):
+                phil_in = phil.parse(file_name=phil_in)
+            else:
+                raise ares.RuntimeErrorUser('File not found: {}'.format(phil_in))
+
+        if isinstance(phil_in,phil.scope):
+            phil_in = phil_files.fetch(phil_in).extract()
+
+        assert isinstance(phil_in,phil.scope_extract)
+
+        self.file_groups = phil_files.format(phil_in).extract()
+        self.read_headers()
+
+    def _is_file_key(self,key):
+        """
+        Checks, if the key is available in the group.file scope
+        :param key:
+        :rtype: bool
+        """
+        empty_file = file_object()
+        if key not in empty_file.__dict__.keys():
+            return False
+        else:
+            return True
+
+    def get_file_scope(self, value, key='name'):
+        """
+        Searches self.file_groups for a file, whose key match value. Returns respective file scope.
+
+        :param value: Description of the file to be searched for.
+        :param key: A key name to be searched in. Has to be one of group.file keys
+        :rtype: phil.scope_extract
+        """
+
+        if self._is_file_key(key):
+            raise AttributeError('This key type is not used: {}'.format(key))
+
+        for gr in self.file_groups.group:
+            for fi in gr.file:
+                if fi.__dict__[key] == value:
+                    return fi
+        else:
+            raise KeyError
+
+    def get_header(self, value, key='name'):
+        """
+        Returns header of the file, whose key match value.
+        :param value: Description of the file to be searched for.
+        :param key: A key name to be searched in. Has to be one of group.file keys
+        :rtype: SaxspointH5
+        """
+
+        file_scope = self.get_file_scope(value, key)
+        return self.files_dict[file_scope.path]
+
+    def files(self, key):
+        """
+        Iterates over file keys
+        :param key: Key to iterate over
+        :return: keys
+        """
+        if self._is_file_key(key):
+            raise AttributeError('This key type is not used: {}'.format(key))
+
+        for gr in self.file_groups.group:
+            for fi in gr.file:
+                yield fi.__dict__[key]
+
+    def read_headers(self):
+        """
+        Reads the file headers, and fills the self.files_dict
+        """
+        self.files_dict = pwr.get_headers_dict(list(self.files('path')))
+
+    def write_groups(self):
+        '''
+        Write the file groups to a file
+        :return:
+        '''
+
+        try:
+            with open(self.params.output,'w') as fiout:
+                phil_files.extract(self.file_groups).show(out=fiout)
+        except PermissionError:
+            ares.RuntimeErrorUser('Cannot write to {}. Permission denied.'.format(fiout))
+
 class JobImport(ares.Job):
     """
     Run class based on generic Ares run class
@@ -192,30 +350,15 @@ class JobImport(ares.Job):
         :return:
         '''
 
-        pass
-        files = get_files(self.params.search_string, self.params.suffix)
+        run = ImportFiles(self.params)
 
-        saxspoint_geometry_fields =[
-            'entry/instrument/detector/depends_on',
-            'entry/instrument/detector/description',
-            'entry/instrument/detector/detector_number',
-            'entry/instrument/detector/distance',
-            'entry/instrument/detector/height',
-            'entry/instrument/detector/meridional_angle',
-            'entry/instrument/detector/sensor_material',
-            'entry/instrument/detector/sensor_thickness',
-            'entry/instrument/detector/x_pixel_offset',
-            'entry/instrument/detector/x_pixel_size',
-            'entry/instrument/detector/y_pixel_offset',
-            'entry/instrument/detector/y_pixel_size',
-            'entry/instrument/detector/x_translation',
-            'entry/instrument/monochromator',
-        ]
+        files =run.file_groups
+        print(files.as_str(expert_level=0))
+        if self.params.output is not None:
+            with open(self.params.output,'w') as fiout:
+                files.show(out=fiout)
 
-        groups = files_to_groups(files, saxspoint_geometry_fields)
-        files_extract = phil_files.extract()
-        files_extract.group = groups
-        print(phil_files.format(files_extract).as_str(expert_level=0))
+            ares.my_print('List of imported files was written to: {}')
 
         pass
 

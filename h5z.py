@@ -274,7 +274,26 @@ class SaxspointH5():
     A class holding informations on a H5Z file (header snippet). Uses H5-style dictionary
 
     Note, that this might be extended, as projects progresses
+
+    :ivar geometry_fields: List of fields, which describe the experiment geometry
     """
+
+    geometry_fields = [
+        'entry/instrument/detector/depends_on',
+        'entry/instrument/detector/description',
+        'entry/instrument/detector/detector_number',
+        'entry/instrument/detector/distance',
+        'entry/instrument/detector/height',
+        'entry/instrument/detector/meridional_angle',
+        'entry/instrument/detector/sensor_material',
+        'entry/instrument/detector/sensor_thickness',
+        'entry/instrument/detector/x_pixel_offset',
+        'entry/instrument/detector/x_pixel_size',
+        'entry/instrument/detector/y_pixel_offset',
+        'entry/instrument/detector/y_pixel_size',
+        'entry/instrument/detector/x_translation',
+        'entry/instrument/monochromator',
+    ]
 
     def __init__(self, path):
         # self.__temp = tempfile.TemporaryFile()
@@ -310,6 +329,7 @@ class SaxspointH5():
                 path = self.attrs['abs_path']
             except AttributeError:
                 raise AttributeError('Path to the file was not given or set.')
+        #TODO : handle missing/wrong file exceptions
         with FileH5Z(path, 'r', **filters) as h5z:
             # walk(h5z, self.__h5, skip=skip_entries, **filters)
             # for key, val in h5z.attrs.items():
