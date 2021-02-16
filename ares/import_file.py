@@ -154,12 +154,13 @@ def get_files(inpaths, suffixes):
     return file_list
 
 
-def files_to_groups(files, headers_to_match='entry/instrument/detector'):
+def files_to_groups(files, headers_to_match='entry/instrument/detector', ignore_merged=True):
     """
     Split the files in the groups based on common headers.
 
     :param files: list of files to be distributed
     :param headers_to_match: List of headers, which has to match, for files to consider similar
+    :param ignore_merged: If True, merged files will be ignored
     :return:
     """
     groups = []
@@ -172,6 +173,9 @@ def files_to_groups(files, headers_to_match='entry/instrument/detector'):
     group_id = 1
 
     for fi, hd in files.items():
+        if is_merged(hd) and ignore_merged:
+            continue
+
         file_scope = file_object(path=fi)
 
         for group in groups:
@@ -242,11 +246,19 @@ class ImportFiles:
         Processes files using an input parameters in PHIL
         :return:
         """
+        try:
+            phil_core.format(phil_in)
+        except : #TODO: chceck what exception can actually occure
+            raise AttributeError('Wrong input Phil parameters.')
+
         files = get_files(phil_in.search_string, phil_in.suffix)
         ares.my_print('Found {} files. Reading headers...'.format(len(files)))
 
         self.files_dict = pwr.get_headers_dict(files)
-        groups = files_to_groups(self.files_dict)
+        for fi in list(self.files_dict.keys()):
+            if is_merged(self.files_dict[fi]) and phil_in.ignore_merged:
+                self.files_dict.pop(fi)
+        groups = files_to_groups(self.files_dict, ignore_merged=phil_in.ignore_merged)
         ares.my_print(
             'Files assigned to {} groups by common experiment geometry.'.format(len(groups)))
         self.file_groups = phil_files.extract()
