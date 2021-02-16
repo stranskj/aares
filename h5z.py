@@ -172,7 +172,7 @@ def phil_to_h5(scope):
 
 class DatasetH5(np.ndarray):
     """
-    Class mimiking h5py.Dataset
+    Class mimicking h5py.Dataset
 
     Holds the data in a Numpy array, and adds attributes dictionary DatasetH5.attrs
     """
@@ -180,12 +180,15 @@ class DatasetH5(np.ndarray):
     def __new__(self, source_dataset=None, name=None, *args, **kwargs):
 
         if source_dataset is not None:
-            return super().__new__(self, source_dataset.shape, source_dataset.dtype, buffer=source_dataset[()])
+            obj = super().__new__(self, source_dataset.shape, source_dataset.dtype, buffer=source_dataset[()])
         else:
-            return super().__new__(self, *args, **kwargs)
+            obj = super().__new__(self, *args, **kwargs)
+        obj.attrs = {}
+        obj.name = name
+        return obj
 
     def __init__(self, source_dataset=None, name=None, *args, **kwargs):
-        self.attrs = {}
+
         if name is not None:
             self.name = name
 
@@ -193,6 +196,30 @@ class DatasetH5(np.ndarray):
             for key, val in source_dataset.attrs.items():
                 self.attrs[key] = copy.copy(val)
             self.name = source_dataset.name
+
+
+    # It has to be here because standard np.array childs have problems with pickling new attributes
+    # It is important for multiprocessing to work
+    # self.attrs = getattr(obj, 'attrs', None)
+    def __array_finalize__(self, obj):
+        if obj is None: return
+        self.attrs = getattr(obj, 'attrs', None)
+        self.name = getattr(obj, 'name', None)
+
+    def __reduce__(self):
+        # Get the parent's __reduce__ tuple
+        pickled_state = super(DatasetH5, self).__reduce__()
+        # Create our own tuple to pass to __setstate__, but append the __dict__ rather than individual members.
+        new_state = pickled_state[2] + (self.__dict__,)
+        # Return a tuple that replaces the parent's __setstate__ tuple with our own
+        return (pickled_state[0], pickled_state[1], new_state)
+
+    def __setstate__(self, state):
+        self.__dict__.update(state[-1])  # Update the internal dict from state
+        # Call the parent's __setstate__ with the other tuple elements.
+        super(DatasetH5, self).__setstate__(state[0:-1])
+
+    # End of the pickling stuff
 
     def __eq__(self, other):
         if not (isinstance(other, DatasetH5) or isinstance(other,h5py.Dataset)):
