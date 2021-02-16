@@ -92,9 +92,11 @@ prefix = None *time file_name
 ignore_merged = True
 .help = Ignore files with merged frames. Using these diminish some of the Ares features. Moreover, no special handlig fo these is implemented, which can lead to unexpected results.
 .type = bool
+.expert_level = 1
 ''')
 
-def group_object(files = []):
+
+def group_object(files=[], name=None):
     '''
     Returns empty Group scope_extract
     :return:
@@ -105,10 +107,12 @@ def group_object(files = []):
     gr.file.pop()
 
     gr.file.extend(files)
+    gr.name = name
 
     return gr
 
-def file_object(path = None, name = None):
+
+def file_object(path=None, name=None):
     '''
     Returns empty File scope_extract
     :return:
@@ -120,6 +124,7 @@ def file_object(path = None, name = None):
     fo.name = name
     return fo
 
+
 def search_files(indir, suffix):
     fiout = []
     for root, dirs, files in os.walk(indir):
@@ -128,13 +133,14 @@ def search_files(indir, suffix):
                 fiout.append(os.path.join(root, file))
     return fiout
 
+
 def get_files(inpaths, suffixes):
     if isinstance(suffixes, str):
         suffixes = [suffixes]
 
-    for i,suf in enumerate(suffixes):
-        if not(suf[0] == '.'):
-            suffixes[i] = '.'+suf
+    for i, suf in enumerate(suffixes):
+        if not (suf[0] == '.'):
+            suffixes[i] = '.' + suf
 
     files = [[file for file in glob.glob(fi)] for fi in inpaths]
     inpaths = [fi for fi in itertools.chain.from_iterable(files)]
@@ -147,19 +153,23 @@ def get_files(inpaths, suffixes):
             file_list.append(fi)
     return file_list
 
-def files_to_groups(files, headers_to_match = 'entry/instrument/detector'):
-    '''
+
+def files_to_groups(files, headers_to_match='entry/instrument/detector'):
+    """
     Split the files in the groups based on common headers.
+
     :param files: list of files to be distributed
+    :param headers_to_match: List of headers, which has to match, for files to consider similar
     :return:
-    '''
+    """
     groups = []
-    if isinstance(headers_to_match,str):
+    if isinstance(headers_to_match, str):
         headers_to_match = [headers_to_match]
 
-    if not isinstance(files,dict):
+    if not isinstance(files, dict):
         files = pwr.get_headers_dict(files)
 
+    group_id = 1
 
     for fi, hd in files.items():
         file_scope = file_object(path=fi)
@@ -169,10 +179,11 @@ def files_to_groups(files, headers_to_match = 'entry/instrument/detector'):
                 group.file.append(file_scope)
                 break
         else:
-            groups.append(group_object([file_scope]))
-
+            groups.append(group_object([file_scope], name='group{:03d}'.format(group_id)))
+            group_id += 1
 
     return groups
+
 
 def is_merged(file_in):
     '''
@@ -182,10 +193,10 @@ def is_merged(file_in):
     :return:
     '''
 
-    if isinstance(file_in,str):
+    if isinstance(file_in, str):
         try:
             file_in = h5z.SaxspointH5(file_in)
-        except :
+        except:
             raise IOError('Wrong or missing file: {}'.format(file_in))
 
     try:
@@ -194,21 +205,22 @@ def is_merged(file_in):
     except KeyError:
         return False
 
+
 class ImportFiles:
-    '''
+    """
     Handling class to control file imports
 
     :ivar files_dict: Dictionary of read file headers. File path as a key.
     :ivar file_groups: Files ordered into the groups (phil.scope_extract)
-    '''
+    """
 
     def __init__(self, run_phil=None, file_phil=None):
-        '''
+        """
         :param run_phil:
         :type  run_phil: phil.scope_extract
         :return: Returns a list of files separated to groups in format of `import_file.phil_file`
         :rtype: phil.scope_extract
-        '''
+        """
 
         assert (run_phil is not None) ^ (file_phil is not None)
 
@@ -228,9 +240,12 @@ class ImportFiles:
         :return:
         """
         files = get_files(phil_in.search_string, phil_in.suffix)
-        ares.my_print('Found {} files.'.format(len(files)))
+        ares.my_print('Found {} files. Reading headers...'.format(len(files)))
+
         self.files_dict = pwr.get_headers_dict(files)
         groups = files_to_groups(self.files_dict)
+        ares.my_print(
+            'Files assigned to {} groups by common experiment geometry.'.format(len(groups)))
         self.file_groups = phil_files.extract()
         self.file_groups.group = groups
 
@@ -242,21 +257,21 @@ class ImportFiles:
         :return:
         """
 
-        if isinstance(phil_in,str):
+        if isinstance(phil_in, str):
             if os.path.isfile(phil_in):
                 phil_in = phil.parse(file_name=phil_in)
             else:
                 raise ares.RuntimeErrorUser('File not found: {}'.format(phil_in))
 
-        if isinstance(phil_in,phil.scope):
+        if isinstance(phil_in, phil.scope):
             phil_in = phil_files.fetch(phil_in).extract()
 
-        assert isinstance(phil_in,phil.scope_extract)
+        assert isinstance(phil_in, phil.scope_extract)
 
         self.file_groups = phil_files.format(phil_in).extract()
         self.read_headers()
 
-    def _is_file_key(self,key):
+    def _is_file_key(self, key):
         """
         Checks, if the key is available in the group.file scope
         :param key:
@@ -324,10 +339,11 @@ class ImportFiles:
         '''
 
         try:
-            with open(self.params.output,'w') as fiout:
+            with open(self.params.output, 'w') as fiout:
                 phil_files.extract(self.file_groups).show(out=fiout)
         except PermissionError:
             ares.RuntimeErrorUser('Cannot write to {}. Permission denied.'.format(fiout))
+
 
 class JobImport(ares.Job):
     """
@@ -352,16 +368,15 @@ class JobImport(ares.Job):
 
         run = ImportFiles(self.params)
 
-        files =run.file_groups
-        print(files.as_str(expert_level=0))
+        files = phil_files.format(run.file_groups)
+        #       print(files.as_str(expert_level=0))
         if self.params.output is not None:
-            with open(self.params.output,'w') as fiout:
+            with open(self.params.output, 'w') as fiout:
                 files.show(out=fiout)
 
-            ares.my_print('List of imported files was written to: {}')
+            ares.my_print('List of imported files was written to: {}'.format(self.params.output))
 
         pass
-
 
     def __set_system_phil__(self):
         '''
@@ -391,9 +406,11 @@ class JobImport(ares.Job):
         '''
         pass
 
+
 def main():
     job = JobImport()
     return job.job_exit
+
 
 if __name__ == '__main__':
     main()

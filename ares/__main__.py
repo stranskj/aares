@@ -27,6 +27,10 @@ input {
     .multiple = True
     }
 
+reduction {
+    include scope ares.integrate.phil_core
+}
+
 masking {
     include scope ares.mask.phil_core
 }
@@ -68,7 +72,7 @@ def epilog():
 
 class MainJob(ares.Job):
     """
-    Run class based on generic saxpoint run class
+    Run class based on generic Ares run class
     """
 
     def __set_meta__(self):
