@@ -29,7 +29,7 @@ sec {
 phil_sec = phil.parse(phil_sec_str)
 
 phil_core = phil.parse('''
-import {
+to_import {
     include scope ares.import_file.phil_core
     }
     
@@ -57,11 +57,18 @@ def run(params):
     """
 
     if params.input_files is not None:
+        ares.my_print('Reading file headers...')
         files = ares.import_file.ImportFiles(file_phil=params.input_files)
+        ares.my_print('Processed {} files.'.format(len(files.files_dict)))
     else:
-        files = ares.import_file.ImportFiles(run_phil=params.import)
-        files.write_groups()
+        ares.my_print('Importing files...')
+        files = ares.import_file.ImportFiles(run_phil=params.to_import)
+        ares.my_print('Processed {} files.'.format(len(files.files_dict)))
+        ares.my_print('Writing list of imported files to {}.'.format(params.to_import.output))
+        files.write_groups(params.to_import.output)
 
+    if params.sec.sort:
+        files.sort_by_time()
 
 
 
@@ -82,7 +89,7 @@ class JobSec(ares.Job):
         The actual programme worker
         :return:
         '''
-        pass
+        run(self.params)
 
     def __set_system_phil__(self):
         '''
@@ -110,7 +117,7 @@ class JobSec(ares.Job):
 
         :return:
         '''
-        self.params.paths=self.unhandled
+        self.params.to_import.search_string.extend(self.unhandled)
 
 def main(argv=None):
     job = JobSec()

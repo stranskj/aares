@@ -234,6 +234,9 @@ class ImportFiles:
         else:
             raise AssertionError('No argument given.')
 
+    def __len__(self):
+        return len(self.files_dict)
+
     def from_input_phil(self, phil_in):
         """
         Processes files using an input parameters in PHIL
@@ -332,15 +335,25 @@ class ImportFiles:
         """
         self.files_dict = pwr.get_headers_dict(list(self.files('path')))
 
-    def write_groups(self):
+    def sort_by_time(self):
+        """
+        Sort the file dictionary by header time
+        """
+        sorted_dict = {k: self.files_dict[k] for k in sorted(self.files_dict,
+                                                             key=lambda x:self.files_dict[x].file_time_iso)}
+
+        self.files_dict = sorted_dict
+
+
+    def write_groups(self,file_out='files.phil'):
         '''
         Write the file groups to a file
         :return:
         '''
 
         try:
-            with open(self.params.output, 'w') as fiout:
-                phil_files.extract(self.file_groups).show(out=fiout)
+            with open(file_out, 'w') as fiout:
+                phil_files.format(self.file_groups).show(out=fiout)
         except PermissionError:
             ares.RuntimeErrorUser('Cannot write to {}. Permission denied.'.format(fiout))
 
@@ -371,8 +384,7 @@ class JobImport(ares.Job):
         files = phil_files.format(run.file_groups)
         #       print(files.as_str(expert_level=0))
         if self.params.output is not None:
-            with open(self.params.output, 'w') as fiout:
-                files.show(out=fiout)
+            run.write_groups(self.params.output)
 
             ares.my_print('List of imported files was written to: {}'.format(self.params.output))
 
