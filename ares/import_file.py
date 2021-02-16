@@ -255,10 +255,14 @@ class ImportFiles:
         ares.my_print('Found {} files. Reading headers...'.format(len(files)))
 
         self.files_dict = pwr.get_headers_dict(files)
-        for fi in list(self.files_dict.keys()):
-            if is_merged(self.files_dict[fi]) and phil_in.ignore_merged:
-                self.files_dict.pop(fi)
-        groups = files_to_groups(self.files_dict, ignore_merged=phil_in.ignore_merged)
+        if phil_in.ignore_merged:
+            i = 0
+            for fi in list(self.files_dict.keys()):
+                if is_merged(self.files_dict[fi]):
+                    self.files_dict.pop(fi)
+                    i += 1
+            ares.my_print('Excluded {} merged files.'.format(i))
+        groups = files_to_groups(self.files_dict, headers_to_match= h5z.SaxspointH5.geometry_fields ,ignore_merged=phil_in.ignore_merged)
         ares.my_print(
             'Files assigned to {} groups by common experiment geometry.'.format(len(groups)))
         self.file_groups = phil_files.extract()
