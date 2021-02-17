@@ -175,6 +175,8 @@ class DatasetH5(np.ndarray):
     Class mimicking h5py.Dataset
 
     Holds the data in a Numpy array, and adds attributes dictionary DatasetH5.attrs
+
+    Getting data using `[]` returns vanilla numpy.array
     """
 
     def __new__(self, source_dataset=None, name=None, *args, **kwargs):
@@ -221,7 +223,7 @@ class DatasetH5(np.ndarray):
 
     # End of the pickling stuff
 
-    def __eq__(self, other):
+    def __eq__(self, other): # It breaks numpy's elements vice comparison
         if not (isinstance(other, DatasetH5) or isinstance(other,h5py.Dataset)):
             # don't attempt to compare against unrelated types
             return NotImplemented
@@ -236,6 +238,9 @@ class DatasetH5(np.ndarray):
             pass
         return  attr_bool and np.array_equal(self, other)
 
+    # Custom might fix previous...
+    def __getitem__(self, item):
+        return np.array(super().__getitem__(item))
 
 class GroupH5(dict):
     """
