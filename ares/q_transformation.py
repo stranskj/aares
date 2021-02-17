@@ -204,7 +204,7 @@ def get_q(XYZ, beam_vec, wavelength = 1):
 def transform_detector_radial_q(header, beam = (0,0,1), unit='nm'):
     '''
     Perform q-transformation of the detector based on the header.
-    Length of q-vector is returned for each pixel in an array coresponding to the frame.
+    Length of q-vector is returned for each pixel in an array corresponding to the frame.
 
     :param header: SaxspointH5 File header
     :return: numpy.array of frame dimensions

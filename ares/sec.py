@@ -2,6 +2,8 @@ import ares
 import sys,os
 import freephil as phil
 import ares.import_file
+import ares.q_transformation as q_trans
+import ares.mask
 
 __all__ = []
 __version__ = ares.__version__
@@ -69,6 +71,18 @@ def run(params):
 
     if params.sec.sort:
         files.sort_by_time()
+
+    ares.my_print('Q-transformation...')
+    det_q = [q_trans.transform_detector_radial_q(files.files_dict[gr.file[0].path],
+                                                 unit=params.q_transformation.units)
+             for gr in files.file_groups.group]
+
+    ares.my_print('Creating masks...')
+    mask = [ares.mask.composite_mask(params.mask, files.files_dict[gr.file[0].path])
+            for gr in files.file_groups.group]
+
+    ares.mask.draw_mask(mask[0],'sec_mask_test.png')
+    pass
 
 
 

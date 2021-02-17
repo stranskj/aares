@@ -315,7 +315,7 @@ def composite_mask(work_phil, file_header=None):
     # Pixel mask from the file
     if work_phil.pixel_mask:
         ares.my_print('Extracting pixel mask from the datafile...')
-        masks.append(pixel_mask = pixel_mask_from_file(file_header))
+        masks.append(pixel_mask_from_file(file_header))
 
     # Masks from PNG files
     for msk in work_phil.custom:
