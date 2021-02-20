@@ -18,14 +18,14 @@ import numpy
 import math
 import ares.power as pwr
 import concurrent.futures
-import os
+import os, logging
 import freephil as phil
 
 phil_core_str ='''
-    bins_number = 0
+    bins_number = None
     .type = int
     .expert_level = 0
-    .help = Number of bins to which data are devided. If 0, determined automatically.
+    .help = Number of bins to which data are devided. If 0 or None, determined automatically.
     
     q_range = 0 0
     .type = floats(2)
@@ -111,7 +111,7 @@ def list_integration_masks(q_bins, q_array, frame_mask=None):
 
     no_bins = len(q_bins)
 
-    q_masks = map(integration_mask, q_bins, [q_array]*no_bins, [frame_mask]*no_bins)
+    q_masks = pwr.map_mp(integration_mask, q_bins, [q_array]*no_bins, [frame_mask]*no_bins)
 
     return list(q_masks)
 
@@ -175,7 +175,43 @@ def integrate_mp(frame_arr, bin_masks, nproc=None):
 
     return averages, stdev, num
 
+def prepare_bins(arrQ, qmin=None, qmax=None, bins=None, frame_mask=None):
+    """
+    High level function, which prepares q_bins and integration masks
 
+    :param arrQ: Q-transformed frame e.g. array, which holds q-value for each pixel
+    :type arrQ: np.array
+    :param qmin: q_min value
+    :type qmin: float
+    :param qmax: q_max value
+    :type qmax: float
+    :param bins: number of bins
+    :type bins: int
+    :param frame_mask: Additional mask for the frame.
+    :type frame_mask: np.array(bools)
+    :return: Returns array of q_values, and corresponding list of masks used for the integration
+    """
+
+    import ares.q_transformation as qt
+
+    if frame_mask is None:
+        frame_mask = arrQ > 0
+
+    if qmin is None:
+        qmin = arrQ[frame_mask].min()
+    if qmax is None:
+        qmax = arrQ[frame_mask].max()
+
+    if (bins is None) or (bins == 0):
+        origin = numpy.unravel_index(numpy.argmin(arrQ, axis=None),arrQ.shape)
+        to_corners = [math.sqrt((origin[0] - 0)**2 + (origin[1] - 0)**2),
+                      math.sqrt((origin[0] - arrQ.shape[0])**2 + (origin[1] - 0)**2),
+                      math.sqrt((origin[0] - 0)**2 + (origin[1] - arrQ.shape[1])**2),
+                      math.sqrt((origin[0] - arrQ.shape[0])**2 + (origin[1] - arrQ.shape[1])**2)]
+        bins = int(max(to_corners)*0.7)
+
+    q_bins = create_bins(qmin,qmax, bins)
+    return qt.get_q_axis(q_bins), list_integration_masks(q_bins, arrQ, frame_mask)
 
 def test():
     import ares.q_transformation as qt
