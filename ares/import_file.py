@@ -218,7 +218,7 @@ class ImportFiles:
     :ivar file_groups: Files ordered into the groups (phil.scope_extract)
     """
 
-    def __init__(self, run_phil=None, file_phil=None):
+    def __init__(self, run_phil=None, file_phil=None, nproc=None):
         """
         :param run_phil:
         :type  run_phil: phil.scope_extract
@@ -230,6 +230,7 @@ class ImportFiles:
 
         self.files_dict = {}
         self.file_groups = None
+        self.nproc = nproc
 
         if run_phil is not None:
             self.from_input_phil(run_phil)
@@ -254,7 +255,7 @@ class ImportFiles:
         files = get_files(phil_in.search_string, phil_in.suffix)
         ares.my_print('Found {} files. Reading headers...'.format(len(files)))
 
-        self.files_dict = pwr.get_headers_dict(files)
+        self.files_dict = pwr.get_headers_dict(files, nproc=self.nproc)
         if phil_in.ignore_merged:
             i = 0
             for fi in list(self.files_dict.keys()):
@@ -266,7 +267,7 @@ class ImportFiles:
         ares.my_print(
             'Files assigned to {} groups by common experiment geometry.'.format(len(groups)))
         self.file_groups = phil_files.extract()
-        self.file_groups.group = groups
+        self.file_groups = groups
 
     def from_phil_file(self, phil_in):
         """
@@ -287,7 +288,7 @@ class ImportFiles:
 
         assert isinstance(phil_in, phil.scope_extract)
 
-        self.file_groups = phil_files.format(phil_in).extract()
+        self.file_groups = phil_files.format(phil_in).extract().group
         self.read_headers()
 
     def _is_file_key(self, key):
@@ -314,7 +315,7 @@ class ImportFiles:
         if self._is_file_key(key):
             raise AttributeError('This key type is not used: {}'.format(key))
 
-        for gr in self.file_groups.group:
+        for gr in self.file_groups:
             for fi in gr.file:
                 if fi.__dict__[key] == value:
                     return fi
@@ -338,10 +339,10 @@ class ImportFiles:
         :param key: Key to iterate over
         :return: keys
         """
-        if self._is_file_key(key):
+        if not self._is_file_key(key):
             raise AttributeError('This key type is not used: {}'.format(key))
 
-        for gr in self.file_groups.group:
+        for gr in self.file_groups:
             for fi in gr.file:
                 yield fi.__dict__[key]
 
@@ -349,7 +350,7 @@ class ImportFiles:
         """
         Reads the file headers, and fills the self.files_dict
         """
-        self.files_dict = pwr.get_headers_dict(list(self.files('path')))
+        self.files_dict = pwr.get_headers_dict(list(self.files('path')), nproc=self.nproc)
 
     def sort_by_time(self):
         """
