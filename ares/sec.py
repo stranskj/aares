@@ -4,6 +4,8 @@ import freephil as phil
 import ares.import_file
 import ares.q_transformation as q_trans
 import ares.mask
+import ares.power
+import ares.integrate
 
 __all__ = []
 __version__ = ares.__version__
@@ -51,12 +53,16 @@ mask {
 q_transformation {
     include scope ares.q_transformation.phil_core
 }
+
+include scope ares.power.phil_job_control
 ''',process_includes=True)
 
 def run(params):
     """
     Running function for SEC
     """
+
+    threads, jobs = ares.power.get_cpu_distribution(params.job_control)
 
     if params.input_files is not None:
         ares.my_print('Reading file headers...')
@@ -73,16 +79,33 @@ def run(params):
         files.sort_by_time()
 
     ares.my_print('Q-transformation...')
-    det_q = [q_trans.transform_detector_radial_q(files.files_dict[gr.file[0].path],
+    det_qs = [q_trans.transform_detector_radial_q(files.files_dict[gr.file[0].path],
                                                  unit=params.q_transformation.units)
-             for gr in files.file_groups.group]
+             for gr in files.file_groups]
 
     ares.my_print('Creating masks...')
-    mask = [ares.mask.composite_mask(params.mask, files.files_dict[gr.file[0].path])
-            for gr in files.file_groups.group]
+    masks = [ares.mask.composite_mask(params.mask, files.files_dict[gr.file[0].path])
+            for gr in files.file_groups]
 
-    ares.mask.draw_mask(mask[0],'sec_mask_test.png')
-    pass
+    if (params.integrate.q_range[0] == 0) and (params.integrate.q_range[1] == 0):
+        qmin = None
+        qmax = None
+    else:
+        qmin = min(params.integrate.q_range)
+        qmax = max(params.integrate.q_range)
+
+    for mask, det_q, group in zip(masks, det_qs,files.file_groups):
+        ares.my_print('Preparing bins...')
+        q_val, q_mask = ares.integrate.prepare_bins(det_q,
+                                                    qmin,
+                                                    qmax,
+                                                    params.integrate.bins_number,
+                                                    mask)
+        ares.my_print('Using:\nq_min: {qmin:.3f} {un}^-1\nq_max: {qmax:.2f} {un}^-1\nNo.bins: {bins}'.format(qmin=min(q_val),
+                                                                                                             qmax=max(q_val),
+                                                                                                             bins=len(q_val),
+                                                                                                             un=params.q_transformation.units))
+
 
 
 
