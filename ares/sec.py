@@ -6,6 +6,9 @@ import ares.q_transformation as q_trans
 import ares.mask
 import ares.power
 import ares.integrate
+import ares.export
+import math
+import h5z
 
 __all__ = []
 __version__ = ares.__version__
@@ -57,6 +60,35 @@ q_transformation {
 include scope ares.power.phil_job_control
 ''',process_includes=True)
 
+
+
+def integrate_file(header, q_masks, q_bins, start_frame=1, prefix='frame', numdigit=None,  nproc=None, sep=" "):
+    """
+    Integrates individual frames of the file
+    :param header: File header
+    :type header: h5z.SaxspointH5
+    :param q_masks: Binning masks
+    :param prefix: Prefix for the file output
+    :param start_frame: Numbering of the first frame
+    :param nproc: Number of CPUs to be used
+    :param sep: Column separator in the output
+    :return:
+    """
+
+    if numdigit is None:
+        numdigit = int(math.log10(len(header['entry/data/time']))) + 1
+
+    ares.my_print('Reducing file: {}'.format(header.path))
+    with h5z.FileH5Z(header.path) as h5f:
+        for frame in h5f['entry/data/data'][:]:
+            avr, std, num = ares.integrate.integrate_mp(frame, q_masks, nproc)
+            ares.export.write_atsas(q_bins, avr, std,
+                                    file_name=prefix+str(start_frame).zfill(numdigit)+'.dat',
+                                    header=['# {} {}'.format(header.path, str(start_frame).zfill(numdigit))])
+            start_frame += 1
+
+
+
 def run(params):
     """
     Running function for SEC
@@ -94,6 +126,8 @@ def run(params):
         qmin = min(params.integrate.q_range)
         qmax = max(params.integrate.q_range)
 
+    group_digit = int(math.log10(len(files.file_groups))) + 1
+    group_id = 1
     for mask, det_q, group in zip(masks, det_qs,files.file_groups):
         ares.my_print('Preparing bins...')
         q_val, q_mask = ares.integrate.prepare_bins(det_q,
@@ -106,6 +140,39 @@ def run(params):
                                                                                                              bins=len(q_val),
                                                                                                              un=params.q_transformation.units))
 
+        fi_names = [ fi.path for fi in group.file]
+        files_ordered = {key:val for key, val in files.files_dict.items() if key in fi_names}
+
+        start_frames = []
+        start_frame = params.sec.output.start_frame
+        for fi in files_ordered.keys():
+            start_frames.append(start_frame)
+            start_frame += len(files_ordered[fi]['entry/data/time'])
+
+
+
+        group_prefix = os.path.join(params.sec.output.directory,
+                                    params.sec.output.prefix+"_"+str(group_id).zfill(group_digit)+"_")
+
+        if not os.path.isdir(params.sec.output.directory):
+            try:
+                os.mkdir(params.sec.output.directory)
+            except:
+                raise ares.RuntimeErrorUser('Path is not a directory: {}'.format(params.sec.output.directory))
+
+        from functools import partial
+        integrate_partial = partial(integrate_file, numdigit=int(math.log10(start_frame)) + 1,
+                                    prefix=group_prefix,
+                                    nproc=threads)
+        ares.power.map_mp(integrate_partial,
+                          list(files_ordered.values()),
+                          [q_mask]*len(files_ordered),
+                          [q_val]*len(files_ordered),
+                          start_frames,
+                          nchunks=jobs)
+        ares.my_print("Processed {} frames in group {}".format(start_frame, group_id))
+
+        group_id +=1
 
 
 

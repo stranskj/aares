@@ -132,10 +132,13 @@ def map_mp(func1d, *args, nchunks=None, **kwargs):
     if nchunks is None:
         nchunks = multiprocessing.cpu_count()
 
+
+
     with concurrent.futures.ProcessPoolExecutor(max_workers=nchunks) as ex:
         res_chunks = ex.map(mp_worker,
-                            [func1d] * length_iterable, args, kwargs,
-                            chunksize=int(length_iterable / nchunks))
+                            [func1d] * length_iterable, *args, **kwargs,
+                            chunksize=max(1,int(length_iterable / nchunks)))
+
     return list(res_chunks)
 
 

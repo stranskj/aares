@@ -117,13 +117,14 @@ def list_integration_masks(q_bins, q_array, frame_mask=None):
 
 def integrate(frame_arr, bin_masks):
     '''
-    Calculate averages and stedevs across frames in all bins
+    Calculate averages and stddevs across frames in all bins
     :param frame_arr: data; 3d np.array
     :param bin_masks: bin masks
     :return: np.array, np. array: averges and stdevs
     '''
 
-    no_frame = frame_arr.shape[0]
+    if len(frame_arr.shape) == 2:
+        frame_arr = numpy.array([frame_arr])
 
     averages = []
     stdev    = []
@@ -211,7 +212,8 @@ def prepare_bins(arrQ, qmin=None, qmax=None, bins=None, frame_mask=None):
         bins = int(max(to_corners)*0.7)
 
     q_bins = create_bins(qmin,qmax, bins)
-    return qt.get_q_axis(q_bins), list_integration_masks(q_bins, arrQ, frame_mask)
+    q_masks =  list_integration_masks(q_bins, arrQ, frame_mask)
+    return qt.get_q_axis(q_bins), q_masks
 
 def test():
     import ares.q_transformation as qt

@@ -435,6 +435,21 @@ class SaxspointH5():
 
         return tm[:26] + tm[27:]
 
+    @property
+    def path(self):
+        """
+        File path
+        :return:
+        """
+        return self.attrs['path']
+    @property
+    def abs_path(self):
+        """
+        File absolute path
+        :return:
+        """
+        return self.attrs['abs_path']
+
 def test_equal_Datasets():
     f1 = 'data/10x1s.h5'
     header = SaxspointH5(f1)
