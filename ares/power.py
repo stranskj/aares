@@ -24,6 +24,7 @@ job_control {
     
     threads = None
     .help = 'Number of CPUs used per one job. If None, determined automatically.'
+    .type = int
 }
 ''')
 
