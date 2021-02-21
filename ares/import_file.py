@@ -265,7 +265,7 @@ class ImportFiles:
             ares.my_print('Excluded {} merged files.'.format(i))
         groups = files_to_groups(self.files_dict, headers_to_match= h5z.SaxspointH5.geometry_fields ,ignore_merged=phil_in.ignore_merged)
         ares.my_print(
-            'Files assigned to {} groups by common experiment geometry.'.format(len(groups)))
+            'Files assigned to {} group(s) by common experiment geometry.'.format(len(groups)))
         self.file_groups = phil_files.extract()
         self.file_groups = groups
 
@@ -369,8 +369,10 @@ class ImportFiles:
         '''
 
         try:
+            group_out = phil_files.extract()
+            group_out.group = self.file_groups
             with open(file_out, 'w') as fiout:
-                phil_files.format(self.file_groups).show(out=fiout)
+                phil_files.format(group_out).show(out=fiout)
         except PermissionError:
             ares.RuntimeErrorUser('Cannot write to {}. Permission denied.'.format(fiout))
 
