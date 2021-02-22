@@ -111,7 +111,7 @@ def list_integration_masks(q_bins, q_array, frame_mask=None):
 
     no_bins = len(q_bins)
 
-    q_masks = pwr.map_mp(integration_mask, q_bins, [q_array]*no_bins, [frame_mask]*no_bins)
+    q_masks = pwr.map_th(integration_mask, q_bins, [q_array]*no_bins, [frame_mask]*no_bins)
 
     return list(q_masks)
 
@@ -123,8 +123,8 @@ def integrate(frame_arr, bin_masks):
     :return: np.array, np. array: averges and stdevs
     '''
 
-    if len(frame_arr.shape) == 2:
-        frame_arr = numpy.array([frame_arr])
+    if isinstance(bin_masks, numpy.ndarray) and len(bin_masks.shape) == 2:
+        bin_masks.shape = (1, *bin_masks.shape)
 
     averages = []
     stdev    = []
@@ -165,8 +165,12 @@ def integrate_mp(frame_arr, bin_masks, nproc=None):
     if nproc is None:
         nproc = os.cpu_count()
 
-    with concurrent.futures.ProcessPoolExecutor(nproc) as ex:
+    if len(frame_arr.shape) == 2:
+        frame_arr.shape = (1,*frame_arr.shape)
+
+    with concurrent.futures.ThreadPoolExecutor(nproc) as ex:
         results = ex.map(integrate, [frame_arr]*nproc, pwr.chunks(bin_masks,int(len(bin_masks)/nproc)+1))
+        #results = pwr.map_th(integrate, [frame_arr]*len(bin_masks), bin_masks, nchunks=nproc)
 
         res = numpy.concatenate(list(results),axis=1)
 

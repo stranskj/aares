@@ -47,10 +47,10 @@ def get_cpu_distribution(job_control):
         threads = job_control.threads
     elif (job_control.jobs is None) and (job_control.threads is not None):
         threads = job_control.threads
-        jobs = int(nproc / threads)
+        jobs = max(1,int(nproc / threads))
     elif (job_control.jobs is not None) and (job_control.threads is None):
         jobs = job_control.jobs
-        threads = int(nproc / jobs)
+        threads = max(1,int(nproc / jobs))
     else:
         jobs = int(nproc / 8)
         if nproc % 8 > 0:
@@ -133,9 +133,32 @@ def map_mp(func1d, *args, nchunks=None, **kwargs):
     if nchunks is None:
         nchunks = multiprocessing.cpu_count()
 
-
-
     with concurrent.futures.ProcessPoolExecutor(max_workers=nchunks) as ex:
+        res_chunks = ex.map(mp_worker,
+                            [func1d] * length_iterable, *args, **kwargs,
+                            chunksize=max(1,int(length_iterable / nchunks)))
+
+    return list(res_chunks)
+
+def map_th(func1d, *args, nchunks=None, **kwargs):
+    """
+    Divide list into chunks, and process them in parallel. Eqivavlent to ''map'' function.
+    :param func1d: function to be used
+    :param lst: list to be processed
+    :param nchunks: number of chunks; all processed in parallel. If None, equals to nmber of CPUs
+    :param args, kwargs: arguments for the function, as  with map
+    :return: list of results
+    """
+
+    try:
+        length_iterable = len(args[0])
+    except IndexError:
+        raise AttributeError('Nothing to iterate over.')
+
+    if nchunks is None:
+        nchunks = multiprocessing.cpu_count()
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=nchunks) as ex:
         res_chunks = ex.map(mp_worker,
                             [func1d] * length_iterable, *args, **kwargs,
                             chunksize=max(1,int(length_iterable / nchunks)))
