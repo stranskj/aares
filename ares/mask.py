@@ -148,7 +148,7 @@ def beamstop_hole(beam_xy, hole_pixel_radius, beamstop_mask):
 
     i = np.arange(beamstop_mask.shape[0])
     j = np.arange(beamstop_mask.shape[1])
-    I, J = np.meshgrid(j, i)
+    J,I = np.meshgrid(j,i)
 
     circle = (I - beam_xy[0]) ** 2 + (J - beam_xy[1]) ** 2 < hole_pixel_radius ** 2
 
@@ -169,25 +169,25 @@ def rough_beamstop(beam_xy, frame_size, beamstop_pixel_radius, tilt = None):
 
     i = np.arange(frame_size[0])
     j = np.arange(frame_size[1])
-    I, J = np.meshgrid(j, i)
+    J, I = np.meshgrid(j,i)
 
     circle = (I - beam_xy[0]) ** 2 + (J - beam_xy[1]) ** 2 > beamstop_pixel_radius ** 2
-    neck_base_center = (frame_size[1] / 2, 0)
+    neck_base_center = (0,frame_size[1] / 2)
     # beamstop is strip of points within distance from connection of beam center and middle of bottom edge.
     # the connection is ax + by + c =0
 
     try:
-        a = (beam_xy[1]-neck_base_center[1])/(neck_base_center[0]-beam_xy[0])
-        b = 1
+        a = (beam_xy[1]-neck_base_center[1])
+        b = (neck_base_center[0]-beam_xy[0])
         c = -a * beam_xy[0] - b * beam_xy[1]
         norm = math.sqrt(a**2 + b**2)
-        stick_x = np.abs(a * I + b*J +c ) > beamstop_pixel_radius * norm
+        stick_y = np.abs(a * I + b*J +c ) > beamstop_pixel_radius * norm
     except ZeroDivisionError:
-        stick_x = np.abs(I-beam_xy[0]) > beamstop_pixel_radius
+        stick_y = np.abs(I-beam_xy[0]) > beamstop_pixel_radius
 
 
     # beamstop is below beam position only
-    stick_y = J > beam_xy[1]
+    stick_x = I > beam_xy[0]
 
     final_mask = np.logical_and(np.logical_or(stick_x, stick_y), circle)
     return final_mask
@@ -455,9 +455,9 @@ def test():
 
     work_phil = phil_core.fetch(test_phil)
     work_extract = work_phil.extract()
-    composite_mask(work_extract)
+    mask = composite_mask(work_extract)
     pass
-#    draw_mask(mask,'test_mask.png')
+    draw_mask(mask,'test_mask.png')
 
 
 def main():

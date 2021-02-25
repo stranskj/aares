@@ -278,7 +278,7 @@ def test():
 
     frame_mask = numpy.logical_and(
         am.read_mask_from_image('frame_alpha_mask_180.png', channel='A', invert=True),
-        am.detector_chip_mask('Eiger R 1M'))
+        am.detector_chip_mask(det_type='Eiger R 1M'))
 
     t0 = time.time()
     arrQ = qt.transform_detector_radial_q(h5hd)
@@ -295,7 +295,7 @@ def test():
 
     with open('data_826.dat', 'w') as fout:
         for q, I, s in zip(q_vals, avr, std):
-            fout.write('{},{},{}\n'.format(q, I, s))
+            fout.write('{} {} {}\n'.format(q, I, s))
 
     #   mask.draw_mask(q_masks[10],'q_mask10.png')
 

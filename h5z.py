@@ -403,14 +403,15 @@ class SaxspointH5():
         """
         Returns x,y offset (in meters), so after applying the primary beam is at 0,0
         """
-        detector_offset_x = self['entry/instrument/detector/x_translation'].item()
-        detector_offset_y = self['entry/instrument/detector/height'].item()
+
+        detector_offset_y = self['entry/instrument/detector/x_translation'].item()
+        detector_offset_x = self['entry/instrument/detector/height'].item()
         return detector_offset_x, detector_offset_y
 
     @property
     def beam_center_px(self):
         """
-        Returns postion of primary beam in pixel coordinates
+        Returns position of primary beam in pixel coordinates
         """
         det = self.detector_offset
         pix = self.pixel_size
