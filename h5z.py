@@ -309,6 +309,13 @@ class SaxspointH5():
 
     :ivar geometry_fields: List of fields, which describe the experiment geometry
     """
+    skip_entries = ['entry/data/data',
+                        'entry/data/x_pixel_offset',
+                        'entry/data/y_pixel_offset',
+                        'entry/instrument/detector/data',
+                        #'entry/instrument/detector/x_pixel_offset',
+                        #'entry/instrument/detector/y_pixel_offset',
+                    ]
 
     geometry_fields = [
         'entry/instrument/detector/depends_on',
@@ -338,7 +345,12 @@ class SaxspointH5():
         self.attrs['abs_path'] = os.path.abspath(self.attrs['path'])
 
     def __getitem__(self, key):
-        return self.__h5[key]
+        if key in self.skip_entries:
+            with FileH5Z(self.abs_path,'r') as h5f:
+                val = h5f[key]
+        else:
+            val = self.__h5[key]
+        return val
 
     def __setitem__(self, key, value):
         self.__h5[key] = value
@@ -349,13 +361,7 @@ class SaxspointH5():
 
     def read_header(self, path=None, **filters):
         #TODO: create as constructor option; store in member variable, if one of those attempted to read later, reopen the file
-        skip_entries = ['entry/data/data',
-                        'entry/data/x_pixel_offset',
-                        'entry/data/y_pixel_offset',
-                        'entry/instrument/detector/data',
-                        #'entry/instrument/detector/x_pixel_offset',
-                        #'entry/instrument/detector/y_pixel_offset',
-                        ]
+
         if path is None:
             try:
                 path = self.attrs['abs_path']
@@ -366,7 +372,7 @@ class SaxspointH5():
             # walk(h5z, self.__h5, skip=skip_entries, **filters)
             # for key, val in h5z.attrs.items():
             #    self.attrs[key] = val
-            self.__h5 = GroupH5(h5z, exclude=skip_entries)
+            self.__h5 = GroupH5(h5z, exclude=self.skip_entries)
 
     @property
     def pixel_size(self):
@@ -449,6 +455,7 @@ class SaxspointH5():
         :return:
         """
         return self.attrs['abs_path']
+
 
 def test_equal_Datasets():
     f1 = 'data/10x1s.h5'
