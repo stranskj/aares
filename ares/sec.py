@@ -158,6 +158,9 @@ def run(params):
         normalize_beam = True
         params.integrate.beam_normalize.real_space = [0, params.mask.beamstop.semitransparent]
 
+    if params.integrate.beam_normalize.real_space is not None:
+        params.integrate.beam_normalize.real_space = numpy.array(params.integrate.beam_normalize.real_space)*0.001
+
     if normalize_beam:
         ares.my_print('Normalization to beam fluctuation will be performed.')
 
@@ -176,7 +179,7 @@ def run(params):
                 un=params.q_transformation.units))
 
         if normalize_beam:
-            beam_bin_mask = ares.integrate.beam_bin_mask(real_space=numpy.array(params.integrate.beam_normalize.real_space)*0.001,
+            beam_bin_mask = ares.integrate.beam_bin_mask(real_space=params.integrate.beam_normalize.real_space,
                                                          q_range=params.integrate.beam_normalize.q_range,
                                                          arrQ=det_q,
                                                          pixel_size=files.files_dict[group.file[0].path].pixel_size[0])
