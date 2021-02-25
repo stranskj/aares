@@ -63,7 +63,7 @@ include scope ares.power.phil_job_control
 
 
 
-def integrate_file(header, q_masks, q_bins, start_frame=1, prefix='frame', numdigit=None,  nproc=None, sep=" "):
+def integrate_file(header, q_masks, q_bins, start_frame=1, prefix='frame', numdigit=None,  nproc=None, scale=None, sep=" "):
     """
     Integrates individual frames of the file
     :param header: File header
@@ -83,6 +83,13 @@ def integrate_file(header, q_masks, q_bins, start_frame=1, prefix='frame', numdi
     with h5z.FileH5Z(header.path) as h5f:
         for frame in h5f['entry/data/data'][:]:
             avr, std, num = ares.integrate.integrate_mp(frame, q_masks, nproc)
+            if scale is not None:
+                frame_scale = scale/avr[-1]
+                avr = avr[:-1]*frame_scale
+                std = std[:-1]*abs(frame_scale)
+                #avr = avr[:-1]
+                #std = std[:-1]
+                num = num[:-1]
             ares.export.write_atsas(q_bins, avr, std,
                                     file_name=prefix+str(start_frame).zfill(numdigit)+'.dat',
                                     header=['# {} {}'.format(header.path, str(start_frame).zfill(numdigit))])
@@ -107,6 +114,10 @@ def run(params):
         ares.my_print('Processed {} files.'.format(len(files.files_dict)))
         ares.my_print('Writing list of imported files to {}.'.format(params.to_import.output))
         files.write_groups(params.to_import.output)
+
+    if len(files) == 0:
+        ares.my_print('No files to process.')
+        return
 
     if params.sec.sort:
         files.sort_by_time()
@@ -157,6 +168,13 @@ def run(params):
                                                     qmax,
                                                     params.integrate.bins_number,
                                                     mask)
+        ares.my_print(
+            'Using:\nq_min: {qmin:.3f} {un}^-1\nq_max: {qmax:.2f} {un}^-1\nNo.bins: {bins}'.format(
+                qmin=min(q_val),
+                qmax=max(q_val),
+                bins=len(q_val),
+                un=params.q_transformation.units))
+
         if normalize_beam:
             beam_bin_mask = ares.integrate.beam_bin_mask(real_space=numpy.array(params.integrate.beam_normalize.real_space)*0.001,
                                                          q_range=params.integrate.beam_normalize.q_range,
@@ -166,12 +184,8 @@ def run(params):
             q_mask.append(beam_bin_mask)
             if params.integrate.beam_normalize.scale is None:
                 scale, err, num = ares.integrate.integrate(files.files_dict[group.file[0].path].data,[beam_bin_mask])
-                params.integrate.beam_normalize.scale =scale
-
-        ares.my_print('Using:\nq_min: {qmin:.3f} {un}^-1\nq_max: {qmax:.2f} {un}^-1\nNo.bins: {bins}'.format(qmin=min(q_val),
-                                                                                                             qmax=max(q_val),
-                                                                                                             bins=len(q_val),
-                                                                                                             un=params.q_transformation.units))
+                params.integrate.beam_normalize.scale =scale[0]
+                ares.my_print('Normalization scale: {:.3f}'.format(scale[0]))
 
         fi_names = [ fi.path for fi in group.file]
         files_ordered = {key:val for key, val in files.files_dict.items() if key in fi_names}
@@ -196,7 +210,8 @@ def run(params):
         from functools import partial
         integrate_partial = partial(integrate_file, numdigit=int(math.log10(start_frame)) + 1,
                                     prefix=group_prefix,
-                                    nproc=threads)
+                                    nproc=threads,
+                                    scale=params.integrate.beam_normalize.scale)
         ares.power.map_mp(integrate_partial,
                           list(files_ordered.values()),
                           [q_mask]*len(files_ordered),
