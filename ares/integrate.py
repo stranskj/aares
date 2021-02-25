@@ -21,7 +21,7 @@ import concurrent.futures
 import os, logging
 import freephil as phil
 
-phil_core_str ='''
+phil_core_str = '''
     bins_number = None
     .type = int
     .expert_level = 0
@@ -35,12 +35,12 @@ phil_core_str ='''
     beam_normalize
     .help = Adjust data for beam variation. Pick one of the options q_range or real_space. If 0, it is not used. 
     {
-        q_range = 0 0
+        q_range = None
         .type = floats(2)
         .expert_level = 0
         .help = Adjust to the mean within the q-range. For example, it can be used for backgraound normalization.
         
-        real_space = 0 0
+        real_space = None
         .type = floats(2)
         .expert_level = 0
         .help = Adjust to the mean within the real distance on the detector. Useful for normalization using semi-transparent beamstop: use balue slightly smaller than the beamstop size
@@ -49,6 +49,11 @@ phil_core_str ='''
         .type = float
         .expert_level = 1
         .help = Transmission constant of the semitransparent beamstop.
+        
+        scale = None
+        .type = float
+        .expert_level=1
+        .help = Value, to which all the frames are scaled. If None, value from the first frame is chosen in such a way, that the scale of that frame is 1.
     }
      
 '''
@@ -61,9 +66,10 @@ phil_job_core = phil.parse('''
     .type = path
     
     reduction  {
-    '''+ phil_core_str+'''
+    ''' + phil_core_str + '''
     }
 ''', process_includes=True)
+
 
 def create_bins(qmin, qmax, bins):
     '''
@@ -75,21 +81,22 @@ def create_bins(qmin, qmax, bins):
     '''
 
     out = []
-    step = math.fabs(qmin-qmax)/bins
+    step = math.fabs(qmin - qmax) / bins
 
     for i in range(bins):
-        out.append((qmin+i*step, qmin+(i+1)*step))
+        out.append((qmin + i * step, qmin + (i + 1) * step))
 
     return out
 
-def integration_mask(bin, q_array,  frame_mask=None):
-    '''
+
+def integration_mask(bin, q_array, frame_mask=None):
+    """
     Creates integration mask for a single bin
     :param q_array: numpy.array
     :param bin: tuple
     :param frame_mask:
     :return:
-    '''
+    """
 
     bin = sorted(bin)
 
@@ -99,6 +106,41 @@ def integration_mask(bin, q_array,  frame_mask=None):
         frame_mask = True
 
     return numpy.logical_and(q_mask, frame_mask)
+
+
+def beam_bin_mask(q_range=None, real_space=None, arrQ=None, pixel_size=None):
+    """
+    Creates an integration mask for scaling beam variation. For example, it should be location of
+    primary beam, when semitransparent beamstop is used, or rackground range, where signally only
+    from buffer is expected.
+
+    :param q_range, real_space: Range to be used for mean number to which the data should be normalized
+    :type q_range, real_space: tuple
+    :param arrQ: array of Q-values
+    :return: Integration mask
+    """
+
+    assert (q_range is not None or real_space is not None) and not (q_range is not None and real_space is not None)
+
+    bin_mask = arrQ == False
+    if real_space is not None:
+        assert pixel_size is not None
+        import ares.mask
+        beam_xy = numpy.unravel_index(numpy.argmin(arrQ, axis=None), arrQ.shape)
+        beamstop_pix_size = sorted((real_space[0]/pixel_size,real_space[1]/pixel_size))
+
+        inner = ares.mask.beamstop_hole(beam_xy,beamstop_pix_size[0],bin_mask)
+        outer = ares.mask.beamstop_hole(beam_xy,beamstop_pix_size[1],bin_mask)
+
+        bin_mask = numpy.logical_and(outer, numpy.logical_not(inner))
+    else:
+        bin_mask = integration_mask(q_range,arrQ)
+
+
+    return bin_mask
+
+
+
 
 def list_integration_masks(q_bins, q_array, frame_mask=None):
     '''
@@ -111,9 +153,10 @@ def list_integration_masks(q_bins, q_array, frame_mask=None):
 
     no_bins = len(q_bins)
 
-    q_masks = pwr.map_th(integration_mask, q_bins, [q_array]*no_bins, [frame_mask]*no_bins)
+    q_masks = pwr.map_th(integration_mask, q_bins, [q_array] * no_bins, [frame_mask] * no_bins)
 
     return list(q_masks)
+
 
 def integrate(frame_arr, bin_masks):
     '''
@@ -127,31 +170,31 @@ def integrate(frame_arr, bin_masks):
         bin_masks.shape = (1, *bin_masks.shape)
 
     averages = []
-    stdev    = []
-    num      = []
+    stdev = []
+    num = []
 
     for binm in bin_masks:
-     #   int_mask = numpy.array([binm]*no_frame)
-        binval = frame_arr[:,binm]
+        #   int_mask = numpy.array([binm]*no_frame)
+        binval = frame_arr[:, binm]
+        binval = binval[binval>=0] #TODO: performance hit needs checking
         if binval.size <= 0:
             averages.append(numpy.nan)
             stdev.append(numpy.nan)
         else:
-            averages.append(numpy.nanmean(binval,dtype='float64'))
-            stdev.append(numpy.nanstd(binval,dtype='float64')/math.sqrt(binval.size))
-          #  stdev.append(numpy.sqrt(averages[-1])/math.sqrt(binval.size))
+            averages.append(numpy.nanmean(binval, dtype='float64'))
+            stdev.append(numpy.nanstd(binval, dtype='float64') / math.sqrt(binval.size))
+        #  stdev.append(numpy.sqrt(averages[-1])/math.sqrt(binval.size))
         num.append(binval.size)
 
-    #int_masks = [numpy.array([msk]*no_frame) for msk in bin_masks]
+    # int_masks = [numpy.array([msk]*no_frame) for msk in bin_masks]
 
-    #averages = [numpy.average(frame_arr[binm]) for binm in int_masks]
-    #stdev    = [numpy.std(frame_arr[binm]) for binm in int_masks]
+    # averages = [numpy.average(frame_arr[binm]) for binm in int_masks]
+    # stdev    = [numpy.std(frame_arr[binm]) for binm in int_masks]
 
-#    averages = map(numpy.average, [frame_arr]*len(bin_masks), int_masks)
-#    stdev = map(numpy.std,  [frame_arr] * len(bin_masks), int_masks)
+    #    averages = map(numpy.average, [frame_arr]*len(bin_masks), int_masks)
+    #    stdev = map(numpy.std,  [frame_arr] * len(bin_masks), int_masks)
 
     return numpy.array(averages), numpy.array(stdev), numpy.array(num)
-
 
 
 def integrate_mp(frame_arr, bin_masks, nproc=None):
@@ -166,19 +209,21 @@ def integrate_mp(frame_arr, bin_masks, nproc=None):
         nproc = os.cpu_count()
 
     if len(frame_arr.shape) == 2:
-        frame_arr.shape = (1,*frame_arr.shape)
+        frame_arr.shape = (1, *frame_arr.shape)
 
     with concurrent.futures.ThreadPoolExecutor(nproc) as ex:
-        results = ex.map(integrate, [frame_arr]*nproc, pwr.chunks(bin_masks,int(len(bin_masks)/nproc)+1))
-        #results = pwr.map_th(integrate, [frame_arr]*len(bin_masks), bin_masks, nchunks=nproc)
+        results = ex.map(integrate, [frame_arr] * nproc,
+                         pwr.chunks(bin_masks, int(len(bin_masks) / nproc) + 1))
+        # results = pwr.map_th(integrate, [frame_arr]*len(bin_masks), bin_masks, nchunks=nproc)
 
-        res = numpy.concatenate(list(results),axis=1)
+        res = numpy.concatenate(list(results), axis=1)
 
-        averages = res[0,:]
-        stdev    = res[1,:]
-        num      = res[2,:]
+        averages = res[0, :]
+        stdev = res[1, :]
+        num = res[2, :]
 
     return averages, stdev, num
+
 
 def prepare_bins(arrQ, qmin=None, qmax=None, bins=None, frame_mask=None):
     """
@@ -208,16 +253,18 @@ def prepare_bins(arrQ, qmin=None, qmax=None, bins=None, frame_mask=None):
         qmax = arrQ[frame_mask].max()
 
     if (bins is None) or (bins == 0):
-        origin = numpy.unravel_index(numpy.argmin(arrQ, axis=None),arrQ.shape)
-        to_corners = [math.sqrt((origin[0] - 0)**2 + (origin[1] - 0)**2),
-                      math.sqrt((origin[0] - arrQ.shape[0])**2 + (origin[1] - 0)**2),
-                      math.sqrt((origin[0] - 0)**2 + (origin[1] - arrQ.shape[1])**2),
-                      math.sqrt((origin[0] - arrQ.shape[0])**2 + (origin[1] - arrQ.shape[1])**2)]
-        bins = int(max(to_corners)*0.7)
+        origin = numpy.unravel_index(numpy.argmin(arrQ, axis=None), arrQ.shape)
+        to_corners = [math.sqrt((origin[0] - 0) ** 2 + (origin[1] - 0) ** 2),
+                      math.sqrt((origin[0] - arrQ.shape[0]) ** 2 + (origin[1] - 0) ** 2),
+                      math.sqrt((origin[0] - 0) ** 2 + (origin[1] - arrQ.shape[1]) ** 2),
+                      math.sqrt(
+                          (origin[0] - arrQ.shape[0]) ** 2 + (origin[1] - arrQ.shape[1]) ** 2)]
+        bins = int(max(to_corners) * 0.7)
 
-    q_bins = create_bins(qmin,qmax, bins)
-    q_masks =  list_integration_masks(q_bins, arrQ, frame_mask)
+    q_bins = create_bins(qmin, qmax, bins)
+    q_masks = list_integration_masks(q_bins, arrQ, frame_mask)
     return qt.get_q_axis(q_bins), q_masks
+
 
 def test():
     import ares.q_transformation as qt
@@ -229,29 +276,28 @@ def test():
 
     h5hd = h5z.SaxspointH5(fin)
 
-    frame_mask = numpy.logical_and(am.read_mask_from_image('frame_alpha_mask_180.png',channel='A',invert=True),
-                                   am.detector_chip_mask('Eiger R 1M'))
+    frame_mask = numpy.logical_and(
+        am.read_mask_from_image('frame_alpha_mask_180.png', channel='A', invert=True),
+        am.detector_chip_mask('Eiger R 1M'))
 
     t0 = time.time()
     arrQ = qt.transform_detector_radial_q(h5hd)
-    print(time.time() -t0)
+    print(time.time() - t0)
     q_bins = create_bins(arrQ.min(), arrQ.max(), 750)
     q_vals = qt.get_q_axis(q_bins)
     print(time.time() - t0)
-    q_masks = list_integration_masks(q_bins,arrQ, frame_mask=frame_mask)
+    q_masks = list_integration_masks(q_bins, arrQ, frame_mask=frame_mask)
     print(time.time() - t0)
 
     with h5z.FileH5Z(fin) as h5f:
         avr, std, num = integrate_mp(h5f['entry/data/data'][:], q_masks)
     print(time.time() - t0)
 
-    with open('data_826.dat','w') as fout:
-        for q, I, s in zip(q_vals,avr, std):
-            fout.write('{},{},{}\n'.format(q,I,s))
+    with open('data_826.dat', 'w') as fout:
+        for q, I, s in zip(q_vals, avr, std):
+            fout.write('{},{},{}\n'.format(q, I, s))
 
-
-
- #   mask.draw_mask(q_masks[10],'q_mask10.png')
+    #   mask.draw_mask(q_masks[10],'q_mask10.png')
 
     with h5z.FileH5Z(fin) as fid:
         pass
@@ -259,6 +305,7 @@ def test():
 
 def main():
     test()
+
 
 if __name__ == '__main__':
     main()

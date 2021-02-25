@@ -242,6 +242,21 @@ class DatasetH5(np.ndarray):
     def __getitem__(self, item):
         return np.array(super().__getitem__(item))
 
+def ItemH5(item_in):
+    """
+    Reads in item from the file, and returns it. It is generic wrapper for reading GroupH5 and DatasetH5
+    :param item_in: Item to be converted/read
+    :return: GroupH5 or DatasetH5
+    """
+
+    if isinstance(item_in, h5py.Group) or isinstance(item_in,GroupH5):
+        return GroupH5(item_in)
+    elif isinstance(item_in, h5py.Dataset) or isinstance(item_in,DatasetH5):
+        return DatasetH5(item_in)
+    else:
+        raise TypeError('The input type has to be h5py.Group, h5py.Dataset, GroupH5, or DatasetH5. Given: {}'.format(type(item_in)))
+
+
 class GroupH5(dict):
     """
     Class mimiking h5py.Group
@@ -347,7 +362,7 @@ class SaxspointH5():
     def __getitem__(self, key):
         if key in self.skip_entries:
             with FileH5Z(self.abs_path,'r') as h5f:
-                val = h5f[key]
+                val = ItemH5(h5f[key])
         else:
             val = self.__h5[key]
         return val
@@ -440,6 +455,14 @@ class SaxspointH5():
         tm = self.attrs['file_time'].decode()
 
         return tm[:26] + tm[27:]
+
+    @property
+    def data(self):
+        """
+        Actual data
+        :return: numpy.array
+        """
+        return self['entry/data/data']
 
     @property
     def path(self):

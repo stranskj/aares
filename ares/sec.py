@@ -9,6 +9,7 @@ import ares.integrate
 import ares.export
 import math
 import h5z
+import numpy
 
 __all__ = []
 __version__ = ares.__version__
@@ -119,6 +120,8 @@ def run(params):
     masks = [ares.mask.composite_mask(params.mask, files.files_dict[gr.file[0].path])
             for gr in files.file_groups]
 
+    ares.mask.draw_mask(masks[0],'group1_mask.png')
+
     if (params.integrate.q_range[0] == 0) and (params.integrate.q_range[1] == 0):
         qmin = None
         qmax = None
@@ -128,6 +131,25 @@ def run(params):
 
     group_digit = int(math.log10(len(files.file_groups))) + 1
     group_id = 1
+
+
+    normalize_beam = (params.integrate.beam_normalize.real_space is not None
+                        or
+                      params.integrate.beam_normalize.q_range is not None)
+    if normalize_beam and (params.integrate.beam_normalize.real_space is not None
+                        and
+                      params.integrate.beam_normalize.q_range is not None):
+        raise ares.RuntimeErrorUser('Please provide only one '
+                                    'of:\nintegrate.beam_normalize.real_space\nintegrate'
+                                    '.beam_normalize.q_range')
+
+    if not normalize_beam and params.mask.beamstop.semitransparent is not None:
+        normalize_beam = True
+        params.integrate.beam_normalize.real_space = [0, params.mask.beamstop.semitransparent]
+
+    if normalize_beam:
+        ares.my_print('Normalization to beam fluctuation will be performed.')
+
     for mask, det_q, group in zip(masks, det_qs,files.file_groups):
         ares.my_print('Preparing bins...')
         q_val, q_mask = ares.integrate.prepare_bins(det_q,
@@ -135,6 +157,17 @@ def run(params):
                                                     qmax,
                                                     params.integrate.bins_number,
                                                     mask)
+        if normalize_beam:
+            beam_bin_mask = ares.integrate.beam_bin_mask(real_space=numpy.array(params.integrate.beam_normalize.real_space)*0.001,
+                                                         q_range=params.integrate.beam_normalize.q_range,
+                                                         arrQ=det_q,
+                                                         pixel_size=files.files_dict[group.file[0].path].pixel_size[0])
+            ares.mask.draw_mask(beam_bin_mask,'beam_mask.png')
+            q_mask.append(beam_bin_mask)
+            if params.integrate.beam_normalize.scale is None:
+                scale, err, num = ares.integrate.integrate(files.files_dict[group.file[0].path].data,[beam_bin_mask])
+                params.integrate.beam_normalize.scale =scale
+
         ares.my_print('Using:\nq_min: {qmin:.3f} {un}^-1\nq_max: {qmax:.2f} {un}^-1\nNo.bins: {bins}'.format(qmin=min(q_val),
                                                                                                              qmax=max(q_val),
                                                                                                              bins=len(q_val),
