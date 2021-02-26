@@ -71,7 +71,7 @@ custom
     .type = choice
     .help = Image channel to be extracted as a mask
     
-    invert = False
+    invert = True
     .type = bool
     .help = Invert the resulting mask
     
