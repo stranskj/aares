@@ -39,7 +39,7 @@ class RuntimeWarningUser(RuntimeError):
     pass
 
 
-def logging_config(prog_name='ares'):
+def logging_config(prog_name='aares'):
     return dict(
         version=1,
         formatters={
@@ -56,7 +56,7 @@ def logging_config(prog_name='ares'):
                 'class': 'logging.FileHandler',
                 'formatter': 'simple_print',
                 'level': logging.INFO,
-                'filename': 'ares.log',
+                'filename': 'aares.log',
                 'mode': 'a'
             },
             'debug_file': {

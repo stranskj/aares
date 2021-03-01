@@ -12,11 +12,11 @@ Creating masks
 @deffield    updated: Updated
 """
 
-import ares
+import aares
 import logging
 
 __all__ = []
-__version__ = ares.__version__
+__version__ = aares.__version__
 prog_short_description = 'Generates frame mask'
 
 import numpy as np
@@ -61,7 +61,7 @@ beamstop
 }
 
 custom
-    .help = Custom made mask stored as PNG image. The image has to have pixel-to-pixel size with the detector. A template image can be generated using ares.draw2d
+    .help = Custom made mask stored as PNG image. The image has to have pixel-to-pixel size with the detector. A template image can be generated using aares.draw2d
     .multiple = True
     {
     file = None
@@ -209,7 +209,7 @@ def detector_chip_mask(shape = None, x_mask= [], y_mask = [], det_type = None):
             x_mask = detector['x_mask']
             y_mask = detector['y_mask']
         except KeyError:
-            raise ares.RuntimeErrorUser('Unknown detector type: {}\nAvailable types: {}'.format(det_type, list(detectors.keys())))
+            raise aares.RuntimeErrorUser('Unknown detector type: {}\nAvailable types: {}'.format(det_type, list(detectors.keys())))
 
     assert shape is not None
     assert x_mask is not None
@@ -241,11 +241,11 @@ def read_mask_from_image(image_in, channel='A', threshold =128, invert=False):
             elif channel == 'RGB':
                 img_mask = img_in.convert(mode='1')
             else:
-                raise ares.RuntimeErrorUser('Unsupported channel: {}'.format(channel))
+                raise aares.RuntimeErrorUser('Unsupported channel: {}'.format(channel))
     except FileNotFoundError:
-        raise ares.RuntimeErrorUser('File not found: {}'.format(image_in))
+        raise aares.RuntimeErrorUser('File not found: {}'.format(image_in))
     except PIL.UnidentifiedImageError:
-        raise ares.RuntimeErrorUser('Unsupported image for mask.')
+        raise aares.RuntimeErrorUser('Unsupported image for mask.')
 
     flipped = PIL.ImageOps.flip(img_mask)
     mask_np = np.array(flipped.convert(mode='1').getdata()).reshape(img_mask.size[1], img_mask.size[0])
@@ -312,24 +312,24 @@ def composite_mask(work_phil, file_header=None):
         try:
             file_header = h5z.SaxspointH5(work_phil.file)
         except OSError:
-            raise ares.RuntimeErrorUser('Wrong file format. Please provide data file.')
+            raise aares.RuntimeErrorUser('Wrong file format. Please provide data file.')
 
     if file_header is None:
-        raise ares.RuntimeErrorUser('Missing file header. Please provide a data file.')
+        raise aares.RuntimeErrorUser('Missing file header. Please provide a data file.')
 
 
     # Pixel mask from the file
     if work_phil.pixel_mask:
-        ares.my_print('Extracting pixel mask from the datafile...')
+        aares.my_print('Extracting pixel mask from the datafile...')
         masks.append(pixel_mask_from_file(file_header))
 
     # Masks from PNG files
     for msk in work_phil.custom:
-        ares.my_print('Creating mask from file {}'.format(msk.file))
+        aares.my_print('Creating mask from file {}'.format(msk.file))
 
         if msk.file is None:
             #TODO: Is there actually a way to fix it in Freephil?
-            raise ares.RuntimeErrorUser(''''Incomplete definition, parameter 'custom.file' is missing.
+            raise aares.RuntimeErrorUser(''''Incomplete definition, parameter 'custom.file' is missing.
              
 HINT: If you are specifying more parameters for custom mask, please use a PHIL file as an input, which contains following for each custom mask:
 
@@ -347,22 +347,22 @@ custom {
 
     # Chip borders
     if work_phil.detector.chip_borders:
-        ares.my_print('Creating mask for chip borders...')
+        aares.my_print('Creating mask for chip borders...')
         if work_phil.detector.type == 'None':
             detector_type = file_header['entry/instrument/detector/description'].item().decode()
         else:
             detector_type = work_phil.detector.type
 
         if detector_type == 'custom':
-            ares.my_print('Custom detector type. Excluding:')
+            aares.my_print('Custom detector type. Excluding:')
             if work_phil.detector.exclude_lines.rows is None:
                 logging.warning('No pixel row defined to be excluded')
             else:
-                ares.my_print('Rows:    '+', '.join(work_phil.detector.exclude_lines.rows))
+                aares.my_print('Rows:    '+', '.join(work_phil.detector.exclude_lines.rows))
             if work_phil.detector.exclude_lines.columns is None:
                 logging.warning('No pixel column defined to be excluded')
             else:
-                ares.my_print('Columns: '+', '.join(work_phil.detector.exclude_lines.rows))
+                aares.my_print('Columns: '+', '.join(work_phil.detector.exclude_lines.rows))
 
             detector_type = None
 
@@ -376,7 +376,7 @@ custom {
     # Beamstop
 
     if work_phil.beamstop.size > 0:
-        ares.my_print('Creating beamstop mask...')
+        aares.my_print('Creating beamstop mask...')
         if work_phil.beamstop.origin is not None:
             origin = work_phil.beamstop.origin
         else:
@@ -390,7 +390,7 @@ custom {
             )
 
         if work_phil.beamstop.semitransparent is not None:
-            ares.my_print('Applying cut-out for transparent beamstop...')
+            aares.my_print('Applying cut-out for transparent beamstop...')
             beamstop_mask = beamstop_hole(
                 beam_xy=origin,
                 hole_pixel_radius=work_phil.beamstop.semitransparent/file_header.pixel_size[0]/2000,
@@ -399,12 +399,12 @@ custom {
 
         masks.append(beamstop_mask)
 
-    ares.my_print('Merging masks...')
+    aares.my_print('Merging masks...')
     return combine_masks(*masks)
 
-class JobMask(ares.Job):
+class JobMask(aares.Job):
     """
-    Run class based on generic Ares run class
+    Run class based on generic AAres run class
     """
 
     def __set_meta__(self):
@@ -424,7 +424,7 @@ class JobMask(ares.Job):
         '''
         mask = composite_mask(self.params)
 
-        ares.my_print('Saving the mask in the file: {}'.format(self.params.output))
+        aares.my_print('Saving the mask in the file: {}'.format(self.params.output))
         draw_mask(mask,self.params.output)
 
     def __set_system_phil__(self):

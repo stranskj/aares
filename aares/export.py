@@ -1,16 +1,16 @@
-import ares
+import aares
 import sys,os
 import freephil as phil
-import ares.import_file
-import ares.q_transformation as q_trans
-import ares.mask
-import ares.power
-import ares.integrate
+import aares.import_file
+import aares.q_transformation as q_trans
+import aares.mask
+import aares.power
+import aares.integrate
 import math
 import h5z
 
 __all__ = []
-__version__ = ares.__version__
+__version__ = aares.__version__
 prog_short_description = 'Saves the resulting data using various formats.'
 
 
@@ -39,4 +39,4 @@ def write_atsas(q_val, avr, std, file_name, header=[], footer=[], separator=" ")
 
             fiout.writelines(footer)
     except PermissionError:
-        raise ares.RuntimeErrorUser('Cannot write to {}.'.format(file_name))
+        raise aares.RuntimeErrorUser('Cannot write to {}.'.format(file_name))

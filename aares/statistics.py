@@ -16,7 +16,7 @@ import h5z
 import h5py
 import numpy
 import math
-import ares.power as pwr
+import aares.power as pwr
 import concurrent.futures
 import os
 

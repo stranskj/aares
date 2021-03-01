@@ -1,9 +1,9 @@
-import ares
+import aares
 import sys,os
 import freephil as phil
 
 __all__ = []
-__version__ = ares.__version__
+__version__ = aares.__version__
 prog_short_description = 'Integrates scattered intensity'
 
 phil_scope = phil.parse(
@@ -29,7 +29,7 @@ paths = None
 
 )
 
-class JobTestPhil(ares.Job):
+class JobTestPhil(aares.Job):
     def __set_meta__(self):
         '''
         Sets various package metadata

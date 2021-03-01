@@ -2,8 +2,8 @@ import h5z
 import numpy
 import math
 import copy
-import ares.power as pwr
-import ares
+import aares.power as pwr
+import aares
 import freephil as phil
 
 phil_core = phil.parse('''

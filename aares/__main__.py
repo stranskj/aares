@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 
-import ares
-# import ares.uv
+import aares
+# import aares.uv
 import argparse
 import os
 import logging
-from ares import my_print
+from aares import my_print
 import sys
 import pkg_resources
 import importlib
@@ -15,7 +15,7 @@ import freephil as phil
 
 # import psutil
 
-__version__ = ares.__version__
+__version__ = aares.__version__
 
 prog_short_description = 'Another angular REduction for Saxs'
 
@@ -28,11 +28,11 @@ input {
     }
 
 reduction {
-    include scope ares.integrate.phil_core
+    include scope aares.integrate.phil_core
 }
 
 masking {
-    include scope ares.mask.phil_core
+    include scope aares.mask.phil_core
 }
     
 ''', process_includes=True)
@@ -47,7 +47,7 @@ def epilog():
             suffix = ''
 
         for ep in (ept for ept in pkg_resources.iter_entry_points('console_scripts')  # ):
-                   if 'ares' in ept.module_name):
+                   if 'aares' in ept.module_name):
             try:
                 module = importlib.import_module(ep.module_name)
                 return_str += ep.name + suffix + '\n\t' + module.prog_short_description + '\n\n'
@@ -70,14 +70,14 @@ def epilog():
 #          ram_tot=memory['total']/(1024*1024*1024),
 #         ram_avail=memory['available']/(1024*1024*1024))
 
-class MainJob(ares.Job):
+class MainJob(aares.Job):
     """
-    Run class based on generic Ares run class
+    Run class based on generic AAres run class
     """
 
     def __set_meta__(self):
         """
-        Metadata for . See ares.Job for predefined defaults
+        Metadata for . See aares.Job for predefined defaults
         """
         self._program_short_description = prog_short_description
 

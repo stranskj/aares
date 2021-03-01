@@ -12,11 +12,11 @@ Importing data files
 @deffield    updated: Updated
 """
 
-import ares
+import aares
 import logging
 
 __all__ = []
-__version__ = ares.__version__
+__version__ = aares.__version__
 prog_short_description = 'Finds and import the data files'
 
 import h5z
@@ -24,7 +24,7 @@ import freephil as phil
 import glob
 import os
 import itertools
-import ares.power as pwr
+import aares.power as pwr
 
 phil_files = phil.parse('''
 group 
@@ -91,7 +91,7 @@ prefix = None *time file_name
 .type = choice
 
 ignore_merged = True
-.help = Ignore files with merged frames. Using these diminish some of the Ares features. Moreover, no special handlig fo these is implemented, which can lead to unexpected results.
+.help = Ignore files with merged frames. Using these diminish some of the aares features. Moreover, no special handlig fo these is implemented, which can lead to unexpected results.
 .type = bool
 .expert_level = 1
 }
@@ -255,7 +255,7 @@ class ImportFiles:
             raise AttributeError('Wrong input Phil parameters.')
 
         files = get_files(phil_in.search_string, phil_in.suffix)
-        ares.my_print('Found {} files. Reading headers...'.format(len(files)))
+        aares.my_print('Found {} files. Reading headers...'.format(len(files)))
 
         self.files_dict = pwr.get_headers_dict(files, nproc=self.nproc)
         if phil_in.ignore_merged:
@@ -264,9 +264,9 @@ class ImportFiles:
                 if is_merged(self.files_dict[fi]):
                     self.files_dict.pop(fi)
                     i += 1
-            ares.my_print('Excluded {} merged files.'.format(i))
+            aares.my_print('Excluded {} merged files.'.format(i))
         groups = files_to_groups(self.files_dict, headers_to_match= h5z.SaxspointH5.geometry_fields ,ignore_merged=phil_in.ignore_merged)
-        ares.my_print(
+        aares.my_print(
             'Files assigned to {} group(s) by common experiment geometry.'.format(len(groups)))
         self.file_groups = phil_files.extract()
         self.file_groups = groups
@@ -283,7 +283,7 @@ class ImportFiles:
             if os.path.isfile(phil_in):
                 phil_in = phil.parse(file_name=phil_in)
             else:
-                raise ares.RuntimeErrorUser('File not found: {}'.format(phil_in))
+                raise aares.RuntimeErrorUser('File not found: {}'.format(phil_in))
 
         if isinstance(phil_in, phil.scope):
             phil_in = phil_files.fetch(phil_in).extract()
@@ -376,12 +376,12 @@ class ImportFiles:
             with open(file_out, 'w') as fiout:
                 phil_files.format(group_out).show(out=fiout)
         except PermissionError:
-            ares.RuntimeErrorUser('Cannot write to {}. Permission denied.'.format(fiout))
+            aares.RuntimeErrorUser('Cannot write to {}. Permission denied.'.format(fiout))
 
 
-class JobImport(ares.Job):
+class JobImport(aares.Job):
     """
-    Run class based on generic Ares run class
+    Run class based on generic AAres run class
     """
 
     def __set_meta__(self):
@@ -407,7 +407,7 @@ class JobImport(ares.Job):
         if self.params.output is not None:
             run.write_groups(self.params.output)
 
-            ares.my_print('List of imported files was written to: {}'.format(self.params.output))
+            aares.my_print('List of imported files was written to: {}'.format(self.params.output))
 
         pass
 

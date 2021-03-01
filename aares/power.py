@@ -1,5 +1,5 @@
 '''
-Common "power" features for Ares
+Common "power" features for AAres
 '''
 
 import multiprocessing

@@ -16,7 +16,7 @@ import h5z
 import h5py
 import numpy
 import math
-import ares.power as pwr
+import aares.power as pwr
 import concurrent.futures
 import os, logging
 import freephil as phil
@@ -128,12 +128,12 @@ def beam_bin_mask(q_range=None, real_space=None, arrQ=None, pixel_size=None):
     bin_mask = arrQ == False
     if real_space is not None:
         assert pixel_size is not None
-        import ares.mask
+        import aares.mask
         beam_xy = numpy.unravel_index(numpy.argmin(arrQ, axis=None), arrQ.shape)
         beamstop_pix_size = sorted((real_space[0]/pixel_size,real_space[1]/pixel_size))
 
-        inner = ares.mask.beamstop_hole(beam_xy,beamstop_pix_size[0],bin_mask)
-        outer = ares.mask.beamstop_hole(beam_xy,beamstop_pix_size[1],bin_mask)
+        inner = aares.mask.beamstop_hole(beam_xy,beamstop_pix_size[0],bin_mask)
+        outer = aares.mask.beamstop_hole(beam_xy,beamstop_pix_size[1],bin_mask)
 
         bin_mask = numpy.logical_and(outer, numpy.logical_not(inner))
     else:
@@ -245,7 +245,7 @@ def prepare_bins(arrQ, qmin=None, qmax=None, bins=None, frame_mask=None):
     :return: Returns array of q_values, and corresponding list of masks used for the integration
     """
 
-    import ares.q_transformation as qt
+    import aares.q_transformation as qt
 
     if frame_mask is None:
         frame_mask = arrQ > 0
@@ -270,10 +270,10 @@ def prepare_bins(arrQ, qmin=None, qmax=None, bins=None, frame_mask=None):
 
 
 def test():
-    import ares.q_transformation as qt
+    import aares.q_transformation as qt
     import time
-    import ares.mask as am
-    import ares.mask as mask
+    import aares.mask as am
+    import aares.mask as mask
 
     fin = '../data/10x60s_826mm_010Frames.h5'
 
@@ -303,8 +303,8 @@ def test():
         for q, I, s in zip(q_vals, avr, std):
             fout.write('{} {} {}\n'.format(q, I, s))
 
-    import ares.statistics as stats
-    import ares.draw2d as draw2d
+    import aares.statistics as stats
+    import aares.draw2d as draw2d
 
   #  q_averages = stats.averages_to_frame_bins(q_masks, avr)
   #  q_stdevs = stats.averages_to_frame_bins(q_masks, std)
