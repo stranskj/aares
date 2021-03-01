@@ -12,12 +12,53 @@ Draw frame
 @deffield    updated: Updated
 """
 
+import aares
+import sys,os
+import freephil as phil
+
+__all__ = []
+__version__ = aares.__version__
+prog_short_description = 'Draws the frame into a PNG file'
+
 import numpy
 import math
 import PIL.Image
 import PIL.ImageOps
 import matplotlib.cm
 import h5z
+
+phil_core = phil.parse("""
+input = None
+.type = path
+.help = Input file to be drawn
+
+paths = None
+.type = path
+.multiple = True
+.help = Not implemented
+
+frame = None
+.type = str
+.help = Frame or range of frames to be drawn. If None, an average of all frames is drawn
+
+min = 0
+.type = str
+.help = Minimum threshold for the color map. A number, string with multiple of 'min', 'max', 'median' or 'average'. For example: '3*median'
+
+max = 5*median
+.type = str
+.help = Minimum threshold for the color map. A number, string with multiple of 'min', 'max', 'median' or 'average'. For example: '3*median'
+
+output = frame.png
+.type = path
+.help = Output file name
+
+color_map = *jet hot
+.type = choice
+.help = Coloring scheme in the output
+
+""")
+
 
 def draw(frame, fiout, Imax= '2*median', Imin=0, cmap='jet'):
     '''
@@ -30,7 +71,7 @@ def draw(frame, fiout, Imax= '2*median', Imin=0, cmap='jet'):
     :return:
     '''
 
-    treshold = [0,0]
+    threshold = [0,0]
 
     for i,tres in enumerate(list([Imin, Imax])):
         if isinstance(tres, str):
@@ -43,17 +84,22 @@ def draw(frame, fiout, Imax= '2*median', Imin=0, cmap='jet'):
                 val = numpy.nanmax(frame)
             elif splited[-1] == 'min':
                 val = numpy.nanmin(frame)
+
             else:
-                raise AttributeError('Unknown parameter: {}'.splited[-1])
+                val = float(tres)
 
             if len(splited) == 2:
-                treshold[i] = float(splited[0]) * val
+                threshold[i] = float(splited[0]) * val
             else:
-                treshold[i] = val
+                threshold[i] = val
         else:
-            treshold[i] = float(tres)
+            threshold[i] = float(tres)
 
-    Imin, Imax = sorted(treshold)
+    Imin, Imax = sorted(threshold)
+
+    aares.my_print('''Used parameters:
+    min: {min:.1f}
+    max: {max:.1f}'''.format(min=Imin, max=Imax))
 
     normalized = (frame - Imin) / (Imax - Imin)
 
@@ -61,8 +107,8 @@ def draw(frame, fiout, Imax= '2*median', Imin=0, cmap='jet'):
     normalized[normalized < 0] = 0
 
     imshow_kwargs = {
-        'vmax': treshold[1],
-        'vmin': treshold[0],
+        'vmax': threshold[1],
+        'vmin': threshold[0],
         'cmap': 'RdYlBu',
         'extent': (0, frame.shape[0], 0 , frame.shape[1]),
     }
@@ -81,12 +127,62 @@ def draw(frame, fiout, Imax= '2*median', Imin=0, cmap='jet'):
     # ax.set_axis_off()
     # plt.savefig(fiout, bbox_inches='tight', pad_inches=0)
 
+class JobDraw2D(aares.Job):
+    def __set_meta__(self):
+        '''
+        Sets various package metadata
+        '''
+
+        self._program_short_description = prog_short_description
+
+        self._program_name = os.path.basename(sys.argv[0])
+        self._program_version = __version__
+
+    def __worker__(self):
+        '''
+        The actual programme worker
+        :return:
+        '''
+        header = h5z.SaxspointH5(self.params.input)
+        frame = numpy.nanmean(header.data[:], axis=0)
+        draw(frame, self.params.output,Imax=self.params.max,Imin=self.params.min, cmap=self.params.color_map)
+
+    def __set_system_phil__(self):
+        '''
+        Settings of CLI arguments. self._parser to be used as argparse.ArgumentParser()
+        '''
+        self._system_phil = phil_core
+
+    def __argument_processing__(self):
+        '''
+        Adjustments of raw input arguments. Modifies self._args, if needed
+
+        '''
+        pass
+
+    def __help_epilog__(self):
+        '''
+        Epilog for the help
+
+        '''
+        pass
+
+    def __process_unhandled__(self):
+        '''
+        Process unhandled CLI arguments into self.params
+
+        :return:
+        '''
+        self.params.paths=self.unhandled
+
+def main(argv=None):
+    job = JobDraw2D()
+    return job.job_exit
+
+
 def test():
     with h5z.FileH5Z('../data/AgBeh_826mm.h5z') as h5f:
-        draw(numpy.log10(h5f['entry/data/data'][0]+1),'frame.png',5)
-
-    with h5z.FileH5Z('../data/W_826mm_005Frames.h5z') as h5f:
-        draw(numpy.average(h5f['entry/data/data'],axis=0),'beam.png',1)
+        draw(h5f['entry/data/data'][0],'frame.png','0.5*max')
 
 def main():
     test()
