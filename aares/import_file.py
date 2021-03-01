@@ -22,7 +22,7 @@ prog_short_description = 'Finds and import the data files'
 import h5z
 import freephil as phil
 import glob
-import os
+import os, math
 import itertools
 import aares.power as pwr
 
@@ -66,37 +66,57 @@ group
 phil_core = phil.parse('''
 to_import {
 search_string = None
-.help = How should be searched for the file. If it is a folder, it is searched recursively for all data files. Bash-like regex strings are accepted.
+.help = 'How should be searched for the file. If it is a folder, it is searched recursively for all'
+        ' data files. Bash-like regex strings are accepted.'
 .multiple = True
 .type = str
 
 suffix = h5z h5
-.help = Suffixes to search for. HDF5 files are used by the software.
-
+.help = Suffixes to search for. Only HDF5 files are used by the software.
 
 output = files.phil
 .help = PHIL file with description of the imported files and file groups.
 .type = path
 
 name_from = None sample *file_name
-.help = How to generate name of the file
+.help = How to generate name of the file (e.g. file.name entries)
 .type = choice
 
 shorten = True
-.help = Strip the common parts of the file name
+.help = Strip the common parts of the file name, when generating the name
 .type = bool
 
 prefix = None *time file_name
-.help = Prefix the name enumerated by...
+.help = Prefix the file.name enumerated by... It also ensures uniqueness of the naming
 .type = choice
 
 ignore_merged = True
-.help = Ignore files with merged frames. Using these diminish some of the aares features. Moreover, no special handlig fo these is implemented, which can lead to unexpected results.
+.help = 'Ignore files with merged frames. Using these diminish some of the AAres features. Moreover,'
+        'no special handling fo these is implemented, which can lead to unexpected results.'
 .type = bool
 .expert_level = 1
 }
 ''')
 
+def longest_common(list_strings, sep='_'):
+    """
+    Splits strings by `sep`, and return the common sections
+
+    :param str1:
+    :param str2:
+    :return:
+    """
+
+    strips = [string.split(sep) for string in list_strings]
+
+    unique = { key : '' for key in itertools.chain.from_iterable(strips)}
+
+    common = []
+
+    for key in unique.keys():
+        if all([key in strp for strp in strips ]):
+            common.append(key)
+    return common
 
 def group_object(files=[], name=None):
     '''
@@ -270,6 +290,15 @@ class ImportFiles:
             'Files assigned to {} group(s) by common experiment geometry.'.format(len(groups)))
         self.file_groups = phil_files.extract()
         self.file_groups = groups
+        self.set_group_geometries()
+        if phil_in.prefix == 'time':
+            self.sort_by_time()
+            prefix = True
+        elif phil_in.prefix == 'file_name':
+            prefix = True
+        else:
+            prefix = False
+        self.set_name_from_filename(strip_common=phil_in.shorten, prefix=prefix)
 
     def from_phil_file(self, phil_in):
         """
@@ -305,6 +334,52 @@ class ImportFiles:
         else:
             return True
 
+    def set_group_geometries(self):
+        """
+        Sets the `group.geometry` to the first file of the group
+
+        :return:
+        """
+        for group in self.file_groups:
+            group.geometry = group.file[0].path
+
+    def set_name_from_filename(self, strip_common=True, prefix = True, sep='_'):
+        """
+        Set group.file.name based on the file name
+
+        :param strip_common: Uses only unique part of the name
+        :return:
+        """
+        for group in self.file_groups:
+            for fi in group.file:
+                fi.name = fi.path
+
+        if strip_common:
+            for group in self.file_groups:
+                #Strip file path
+                if len(group.file) == 1:
+                    group.file[0].name = os.path.splitext(os.path.split(group.file[0].path)[1])[0]
+                else:
+                    filepaths = [os.path.splitext(fi.path)[0] for fi in group.file]
+                    common_path = os.path.commonpath(filepaths)
+                    for fi in group.file:
+                        fi.name = os.path.splitext(fi.path.split(common_path)[1].strip('.\/_'+sep))[0]
+
+                    common = longest_common([fi.name for fi in group.file])
+                    for fi in group.file:
+                        name = fi.name.split(sep)
+                        for cmn in common:
+                            name.remove(cmn)
+                        fi.name = sep.join(name)
+
+        if prefix:
+            i = 1
+            digit = int(math.log10(len(self.files_dict))) + 1
+            for fi in self.files_dict.keys():
+                scope = self.get_file_scope(fi, key='path')
+                scope.name = sep.join([str(i).zfill(digit), scope.name])
+                i += 1
+
     def get_file_scope(self, value, key='name'):
         """
         Searches self.file_groups for a file, whose key match value. Returns respective file scope.
@@ -314,7 +389,7 @@ class ImportFiles:
         :rtype: phil.scope_extract
         """
 
-        if self._is_file_key(key):
+        if not self._is_file_key(key):
             raise AttributeError('This key type is not used: {}'.format(key))
 
         for gr in self.file_groups:
@@ -400,14 +475,14 @@ class JobImport(aares.Job):
         :return:
         '''
 
-        run = ImportFiles(self.params)
+        run = ImportFiles(self.params.to_import)
 
         files = phil_files.format(run.file_groups)
         #       print(files.as_str(expert_level=0))
-        if self.params.output is not None:
-            run.write_groups(self.params.output)
+        if self.params.to_import.output is not None:
+            run.write_groups(self.params.to_import.output)
 
-            aares.my_print('List of imported files was written to: {}'.format(self.params.output))
+            aares.my_print('List of imported files was written to: {}'.format(self.params.to_import.output))
 
         pass
 
@@ -430,7 +505,7 @@ class JobImport(aares.Job):
 
         :return:
         '''
-        self.params.search_string.extend(self.unhandled)
+        self.params.to_import.search_string.extend(self.unhandled)
 
     def __help_epilog__(self):
         '''
