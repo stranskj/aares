@@ -301,7 +301,9 @@ def test():
 
     with open('data_826.dat', 'w') as fout:
         for q, I, s in zip(q_vals, avr, std):
-            fout.write('{} {} {}\n'.format(q, I, s))import ares.statistics as stats
+            fout.write('{} {} {}\n'.format(q, I, s))
+
+    import ares.statistics as stats
     import ares.draw2d as draw2d
 
   #  q_averages = stats.averages_to_frame_bins(q_masks, avr)
