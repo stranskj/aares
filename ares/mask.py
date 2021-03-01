@@ -211,6 +211,10 @@ def detector_chip_mask(shape = None, x_mask= [], y_mask = [], det_type = None):
         except KeyError:
             raise ares.RuntimeErrorUser('Unknown detector type: {}\nAvailable types: {}'.format(det_type, list(detectors.keys())))
 
+    assert shape is not None
+    assert x_mask is not None
+    assert y_mask is not None
+
     mask = np.ones(shape,dtype=bool)
 
     for x in x_mask:

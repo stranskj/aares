@@ -166,15 +166,15 @@ def integrate(frame_arr, bin_masks):
     Calculate averages and stddevs across frames in all bins
     :param frame_arr: data; 3d np.array
     :param bin_masks: bin masks
-    :return: np.array, np. array: averges and stdevs
+    :return: np.array, np. array, np.array: averages, stddevs, number of points in bin
     '''
 
     if isinstance(bin_masks, numpy.ndarray) and len(bin_masks.shape) == 2:
         bin_masks.shape = (1, *bin_masks.shape)
 
     averages = []
-    stdev = []
-    num = []
+    stdev    = []
+    num      = []
 
     for binm in bin_masks:
         #   int_mask = numpy.array([binm]*no_frame)
@@ -202,7 +202,7 @@ def integrate(frame_arr, bin_masks):
 
 def integrate_mp(frame_arr, bin_masks, nproc=None):
     '''
-    Calculate averages and stedevs across frames in all bins, parallel in multiple chunks
+    Calculate averages and stddevs across frames in all bins, parallel in multiple chunks
     :param frame_arr: data; 3d np.array
     :param bin_masks: bin masks
     :return: np.array, np. array: averges and stdevs
@@ -221,9 +221,9 @@ def integrate_mp(frame_arr, bin_masks, nproc=None):
 
         res = numpy.concatenate(list(results), axis=1)
 
-        averages = res[0, :]
-        stdev = res[1, :]
-        num = res[2, :]
+        averages = res[0,:]
+        stdev    = res[1,:]
+        num      = res[2,:]
 
     return averages, stdev, num
 
@@ -280,8 +280,10 @@ def test():
     h5hd = h5z.SaxspointH5(fin)
 
     frame_mask = numpy.logical_and(
-        am.read_mask_from_image('frame_alpha_mask_180.png', channel='A', invert=True),
+        am.read_mask_from_image('frame_alpha_mask.png', channel='A', invert=True),
         am.detector_chip_mask(det_type='Eiger R 1M'))
+
+    #frame_mask = am.read_mask_from_image('frame_alpha_mask.png',channel='A',invert=True)
 
     t0 = time.time()
     arrQ = qt.transform_detector_radial_q(h5hd)
@@ -293,12 +295,31 @@ def test():
     print(time.time() - t0)
 
     with h5z.FileH5Z(fin) as h5f:
-        avr, std, num = integrate_mp(h5f['entry/data/data'][:], q_masks)
+        frames = h5f['entry/data/data'][:]
+        avr, std, num = integrate_mp(frames, q_masks)
     print(time.time() - t0)
 
     with open('data_826.dat', 'w') as fout:
         for q, I, s in zip(q_vals, avr, std):
-            fout.write('{} {} {}\n'.format(q, I, s))
+            fout.write('{} {} {}\n'.format(q, I, s))import ares.statistics as stats
+    import ares.draw2d as draw2d
+
+  #  q_averages = stats.averages_to_frame_bins(q_masks, avr)
+  #  q_stdevs = stats.averages_to_frame_bins(q_masks, std)
+  #  draw2d.draw(q_averages,'frame_averages.png',Imax=1)
+
+   # relative_dev_pix = stats.local_relative_deviation(frames[0], q_averages, window=15)
+   # draw2d.draw(relative_dev_pix,'pix_dev.png', Imax=3, Imin=-3, cmap='PiYG')
+
+    cc12 = []
+    bin_sz = 5
+    for chnk in pwr.chunks(q_masks,bin_sz):
+        cc12.append(stats.set_cc12(frames[0],chnk))
+
+    with open('cc12.dat','w') as fout:
+        for i, cc in zip(range(int(750/bin_sz)),cc12):
+            fout.write('{} {}\n'.format(q_vals[bin_sz*i],cc))
+
 
     #   mask.draw_mask(q_masks[10],'q_mask10.png')
 
