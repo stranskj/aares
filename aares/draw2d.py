@@ -32,11 +32,6 @@ input = None
 .type = path
 .help = Input file to be drawn
 
-paths = None
-.type = path
-.multiple = True
-.help = Not implemented
-
 frame = None
 .type = str
 .help = Frame or range of frames to be drawn. If None, an average of all frames is drawn
@@ -143,6 +138,9 @@ class JobDraw2D(aares.Job):
         The actual programme worker
         :return:
         '''
+
+        if not h5z.is_h5_file(self.params.input):
+            raise aares.RuntimeErrorUser('Unsupported file type: {}'.format(self.params.input))
         header = h5z.SaxspointH5(self.params.input)
         frame = numpy.nanmean(header.data[:], axis=0)
         draw(frame, self.params.output,Imax=self.params.max,Imin=self.params.min, cmap=self.params.color_map)
@@ -173,7 +171,10 @@ class JobDraw2D(aares.Job):
 
         :return:
         '''
-        self.params.paths=self.unhandled
+        if len(self.unhandled) > 1:
+            raise aares.RuntimeErrorUser('Too much argument to be processed. Only 1 file can be drawn at a time.')
+
+        self.params.input=self.unhandled[0]
 
 def main(argv=None):
     job = JobDraw2D()
@@ -184,8 +185,8 @@ def test():
     with h5z.FileH5Z('../data/AgBeh_826mm.h5z') as h5f:
         draw(h5f['entry/data/data'][0],'frame.png','0.5*max')
 
-def main():
-    test()
+#def main():
+#    test()
 
 if __name__ == '__main__':
     main()

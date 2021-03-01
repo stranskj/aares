@@ -143,8 +143,6 @@ def beam_bin_mask(q_range=None, real_space=None, arrQ=None, pixel_size=None):
     return bin_mask
 
 
-
-
 def list_integration_masks(q_bins, q_array, frame_mask=None):
     '''
     Returns list of masks to be used for the integration.

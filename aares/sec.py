@@ -128,7 +128,7 @@ def run(params):
              for gr in files.file_groups]
 
     aares.my_print('Creating masks...')
-    masks = [ares.mask.composite_mask(params.mask, files.files_dict[gr.file[0].path])
+    masks = [aares.mask.composite_mask(params.mask, files.files_dict[gr.file[0].path])
             for gr in files.file_groups]
 
     aares.mask.draw_mask(masks[0],'group1_mask.png')

@@ -83,45 +83,60 @@ def sliding_average_frame(frame, window):
     avr = numpy.nanmean(arrays_window,axis=(2,3))
     return avr
 
-def set_cc12(dataset, qbins):
+def set_cc12(dataset, qbins, wedges=None):
     '''
     Returns CC1/2 for the dataset
 
-    :param dataset:
+    :param dataset: Single frame to be analyzed
+    :type dataset: numpy.array
+    :param qbins: q-bin masks
+    :type qbins: list of numpy.arrays
+    :param wedges: Number of q-range wedges, in which cc12 is also calculated
     :return: float
     '''
 
     half1 = []
     half2 = []
 
-    for bin in qbins:
+    def bin_worker(bin):
         h1 = []
         h2 = []
-        for i in range(10):  # Calculate for 10 different splits and average
-            splited = random_sets(dataset[bin],2)
-            if (len(splited[0]) > 0) and (len(splited[1]) > 0):
-                h1.append(numpy.nanmean(splited[0]))
-                h2.append(numpy.nanmean(splited[1]))
-            else:
-                h1.append(numpy.nan)
-                h2.append(numpy.nan)
 
-        half1.append(numpy.nanmean(h1))
-        half2.append(numpy.nanmean(h2))
+        split = random_sets(dataset[bin],2)
+        if (len(split[0]) > 0) and (len(split[1]) > 0):
+            h1.append(numpy.nanmean(split[0]))
+            h2.append(numpy.nanmean(split[1]))
+        else:
+            h1.append(numpy.nan)
+            h2.append(numpy.nan)
+
+        return h1, h2
+
+    halfs = numpy.array(pwr.map_th(bin_worker, qbins))
+    half1 = halfs[:,0,0]
+    half2 = halfs[:,1,0]
 
     cc12 = numpy.corrcoef(numpy.array(half1),numpy.array(half2))[0,1]
-    return cc12
+
+    if wedges is not None:
+        cc12_wedges = []
+        for h1, h2 in zip(numpy.array_split(half1,wedges),
+                          numpy.array_split(half2,wedges)):
+            cc12_wedges.append(numpy.corrcoef(numpy.array(h1),numpy.array(h2))[0,1])
+    else:
+        cc12_wedges = None
+    return cc12, cc12_wedges
 
 def random_sets(dataset, nsets):
     '''
     Returns random split of the dataset
 
     :param dataset:
-    :param nsets: number of sets to the dataset to be devided into
+    :param nsets: number of sets to the dataset to be divided into
     :return: list of bool arrays
     '''
-    indicies = numpy.random.permutation(dataset.flatten())
-    chunks = numpy.array_split(indicies,nsets)
+    indices = numpy.random.permutation(dataset.flatten())
+    chunks = numpy.array_split(indices,nsets)
 
     subset_masks = []
 
@@ -300,12 +315,13 @@ def rolling_window(array, window=(0,), asteps=None, wsteps=None, axes=None, toen
 
 def test():
 
-    fin = '../data/10x60s_826mm_010Frames.h5'
+    #fin = '../data/10x60s_826mm_010Frames.h5'
+    fin = '../data/buffer_16x60.h5z'
     # fin = '../data/W_826mm_005Frames.h5z'
     #fin = '../data/AgBeh_826mm.h5z'
 
-    with h5z.FileH5Z(fin) as h5f:
-        frames = h5f['entry/data/data'][:]
+    h5f = h5z.SaxspointH5(fin)
+    frames = h5f.data[:]
 
  #   paded = numpy.pad(frames[0],pad_width=2, mode='constant',constant_values=-2)
  #   paded[paded<0]= numpy.nan
@@ -314,7 +330,26 @@ def test():
    # avr = numpy.average(slwnd,axis=(2,3))
 
  #   avr = sliding_average_frame(frames[0],window=5)
-    cc12 = set_cc12(frames)
+    import aares.integrate
+    import aares.q_transformation
+    print('Reading...')
+    arrQ = aares.q_transformation.transform_detector_radial_q(h5f)
+    qvals, qbins = aares.integrate.prepare_bins(arrQ,qmin=0.1,qmax=2)
+    print('Getting CC12')
+    cc12_many = []
+    cc12_w_many = []
+    for i in range(10):
+        cc12, cc12_w = set_cc12(frames[0],qbins,10)
+        cc12_many.append(cc12)
+        cc12_w_many.append(cc12_w)
+
+    cc12_a = numpy.nanmean(cc12_many)
+    cc12_w_a = numpy.nanmean(cc12_w_many,axis=0)
+    cc12_w_s = numpy.nanstd(cc12_w_many, axis=0)
+
+    with open('cc12.dat','w') as fout:
+        for q, cc, s in zip(numpy.array_split(qvals,10), cc12_w_a, cc12_w_s):
+            fout.write('{} {} {}\n'.format(q[-1], cc,s))
     print(cc12)
 
 def main():
