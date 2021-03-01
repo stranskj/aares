@@ -80,8 +80,9 @@ def draw(frame, fiout, Imax= '2*median', Imin=0):
     # plt.savefig(fiout, bbox_inches='tight', pad_inches=0)
 
 def test():
-    with h5z.FileH5Z('../data/AgBeh_826mm.h5z') as h5f:
-        draw(h5f['entry/data/data'][0],'frame.png','0.5*max')
+    #with h5z.FileH5Z('../data/AgBeh_826mm.h5z') as h5f:
+    with h5z.FileH5Z('sec_data/SDD_793mm.001/SDD_793mm.001_060Frames.h5z') as h5f:
+        draw(h5f['entry/data/data'][0],'frame2.png','0.1*max')
 
 def main():
     test()

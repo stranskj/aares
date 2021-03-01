@@ -64,6 +64,7 @@ group
 ''')
 
 phil_core = phil.parse('''
+to_import {
 search_string = None
 .help = How should be searched for the file. If it is a folder, it is searched recursively for all data files. Bash-like regex strings are accepted.
 .multiple = True
@@ -93,6 +94,7 @@ ignore_merged = True
 .help = Ignore files with merged frames. Using these diminish some of the Ares features. Moreover, no special handlig fo these is implemented, which can lead to unexpected results.
 .type = bool
 .expert_level = 1
+}
 ''')
 
 

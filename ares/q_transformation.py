@@ -7,6 +7,7 @@ import ares
 import freephil as phil
 
 phil_core = phil.parse('''
+q_transformation {
 units = *nm A
 .type = choice
 .help = 'Units to be used. The length of scattering vector (:math:`q`) is calculated as :math:`4\pi*sin \\theta/\lambda` in inverse units of choice.'
@@ -14,6 +15,7 @@ units = *nm A
 origin = None
 .type = ints(2)
 .help = Beam position at the detector in pixels
+}
 ''')
 
 def get_item_and_type(data):

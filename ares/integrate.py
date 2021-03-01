@@ -22,10 +22,13 @@ import os, logging
 import freephil as phil
 
 phil_core_str = '''
+reduction
+.help = Parameters controlling the reduction from 2D to 1D
+ {
     bins_number = None
     .type = int
     .expert_level = 0
-    .help = Number of bins to which data are devided. If 0 or None, determined automatically.
+    .help = Number of bins to which data are divided. If 0 or None, determined automatically.
     
     q_range = 0 0
     .type = floats(2)
@@ -48,14 +51,14 @@ phil_core_str = '''
         beamstop_transmission = 1
         .type = float
         .expert_level = 1
-        .help = Transmission constant of the semitransparent beamstop.
+        .help = Transmission constant of the semitransparent beamstop (Not implemented yet).
         
         scale = None
         .type = float
         .expert_level=1
-        .help = Value, to which all the frames are scaled. If None, value from the first frame is chosen in such a way, that the scale of that frame is 1.
+        .help = Value, to which all the frames are scaled. If None, value from the first frame is chosen in such a way, that the scale of that frame is 1. (not implemented yet
     }
-     
+}     
 '''
 
 phil_core = phil.parse(phil_core_str)
@@ -65,9 +68,9 @@ phil_job_core = phil.parse('''
     .multiple = True
     .type = path
     
-    reduction  {
+
     ''' + phil_core_str + '''
-    }
+    
 ''', process_includes=True)
 
 

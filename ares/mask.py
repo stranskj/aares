@@ -28,6 +28,7 @@ import h5z
 
 
 phil_core = phil.parse('''
+mask {
 file = None
 .type = path
 #.multiple = True
@@ -116,6 +117,7 @@ detector
         columns = None
         .type = ints
     }
+}
 }
 ''')
 
