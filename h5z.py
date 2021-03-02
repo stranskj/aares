@@ -390,6 +390,10 @@ class SaxspointH5():
             self.__h5 = GroupH5(h5z, exclude=self.skip_entries)
 
     @property
+    def sample_name(self):
+        return ''.join([chr(i) for i in self['entry/data/sample_name'][0] if i > 0])
+
+    @property
     def pixel_size(self):
         """
         Pixel size of the detector in meters

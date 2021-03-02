@@ -363,7 +363,7 @@ class ImportFiles:
                     filepaths = [os.path.splitext(fi.path)[0] for fi in group.file]
                     common_path = os.path.commonpath(filepaths)
                     for fi in group.file:
-                        fi.name = os.path.splitext(fi.path.split(common_path)[1].strip('.\/_'+sep))[0]
+                        fi.name = os.path.splitext(fi.path.split(common_path)[1].strip('.\/_'+sep))[0].replace('/','_')
 
                     common = longest_common([fi.name for fi in group.file])
                     for fi in group.file:
