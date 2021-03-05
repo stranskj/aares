@@ -159,7 +159,7 @@ def run(params):
         params.reduction.beam_normalize.real_space = [0, params.mask.beamstop.semitransparent]
 
     if params.reduction.beam_normalize.real_space is not None:
-        params.reduction.beam_normalize.real_space = numpy.array(params.reduction.beam_normalize.real_space)*0.001
+        params.reduction.beam_normalize.real_space = numpy.array(params.reduction.beam_normalize.real_space)*0.001/2
 
     if normalize_beam:
         aares.my_print('Normalization to beam fluctuation will be performed.')
@@ -183,7 +183,7 @@ def run(params):
                                                          q_range=params.reduction.beam_normalize.q_range,
                                                          arrQ=det_q,
                                                          pixel_size=files.files_dict[group.file[0].path].pixel_size[0])
-            aares.mask.draw_mask(beam_bin_mask,'beam_mask.png')
+            #aares.mask.draw_mask(beam_bin_mask,'beam_mask.png')
             q_mask.append(beam_bin_mask)
             if params.reduction.beam_normalize.scale is None:
                 scale, err, num = aares.integrate.integrate(files.files_dict[group.file[0].path].data,[beam_bin_mask])
