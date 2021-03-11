@@ -261,6 +261,7 @@ class ImportFiles:
         else:
             raise AssertionError('No argument given.')
 
+
     def __len__(self):
         return len(self.files_dict)
 
@@ -276,6 +277,9 @@ class ImportFiles:
 
         files = get_files(phil_in.search_string, phil_in.suffix)
         aares.my_print('Found {} files. Reading headers...'.format(len(files)))
+
+        if len(files) == 0:
+            raise aares.RuntimeErrorUser('No files found.')
 
         self.files_dict = pwr.get_headers_dict(files, nproc=self.nproc)
         if phil_in.ignore_merged:
