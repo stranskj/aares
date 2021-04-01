@@ -25,8 +25,13 @@ import glob
 import os, math
 import itertools
 import aares.power as pwr
+import pickle, zlib
 
 phil_files = phil.parse('''
+headers = None
+.type = path
+.help = File storing parsed headers. If the file is not present, headers are read from the original data files.
+
 group 
 .multiple = True
 .help = Group of files with the same geometry header
@@ -74,9 +79,18 @@ search_string = None
 suffix = h5z h5
 .help = Suffixes to search for. Only HDF5 files are used by the software.
 
-output = files.phil
+output = files.fls
 .help = PHIL file with description of the imported files and file groups.
 .type = path
+
+headers = None
+.help = File name, where to store preparsed headers. If None, determined from "output"
+.type = path
+
+input_file = None
+.multiple = True
+.type = path
+.help = List of input files in the AAres PHIL format. If the already existing file is given, the headers are read and written again. If multiple files are given, files are merged
 
 name_from = None sample *file_name
 .help = How to generate name of the file (e.g. file.name entries)
@@ -231,6 +245,39 @@ def is_merged(file_in):
     except KeyError:
         return False
 
+def is_fls(fi):
+    '''
+    Checks if the file is AAres PHIL file
+    :param fi:
+    :return:
+    '''
+
+    if fi.endswith('.fls'):
+        return True
+    else:
+        return False
+
+class FileHeadersDictionary(dict):
+    '''
+    A dictionary for storing pre-read file headers (SaxspointH5 objects)
+    '''
+
+    def __getitem__(self, key):
+        '''
+        If the file is not in the dictionary, but exists, it is read to the dictionary
+        :param item:
+        :return:
+        '''
+
+        try:
+            item = super().__getitem__(key)
+        except KeyError:
+            if os.path.exists(key):
+                item = h5z.SaxspointH5(key)
+                self[key] = item
+            else:
+                raise KeyError('Entry does not exist: {}'.format(key))
+        return item
 
 class ImportFiles:
     """
@@ -238,6 +285,7 @@ class ImportFiles:
 
     :ivar files_dict: Dictionary of read file headers. File path as a key.
     :ivar file_groups: Files ordered into the groups (phil.scope_extract)
+    :ivar file_scope: Full phil.scope_extract of phil_files
     """
 
     def __init__(self, run_phil=None, file_phil=None, nproc=None):
@@ -250,7 +298,8 @@ class ImportFiles:
 
         assert (run_phil is not None) ^ (file_phil is not None)
 
-        self.files_dict = {}
+        self._files_dict = FileHeadersDictionary()
+        self.file_scope = phil_files.extract()
         self.file_groups = None
         self.nproc = nproc
 
@@ -264,6 +313,31 @@ class ImportFiles:
 
     def __len__(self):
         return len(self.files_dict)
+
+    @property
+    def files_dict(self):
+        return self._files_dict
+
+    @files_dict.setter
+    def files_dict(self,item):
+        self._files_dict = FileHeadersDictionary()
+        self._files_dict.update(item)
+
+    @property
+    def file_groups(self):
+        return self.file_scope.group
+
+    @file_groups.setter
+    def file_groups(self, item):
+        self.file_scope.group = item
+
+    @property
+    def header_file(self):
+        return self.file_scope.headers
+
+    @header_file.setter
+    def header_file(self, item):
+        self.file_scope.headers = item
 
     def from_input_phil(self, phil_in):
         """
@@ -294,6 +368,12 @@ class ImportFiles:
             'Files assigned to {} group(s) by common experiment geometry.'.format(len(groups)))
         self.file_groups = phil_files.extract()
         self.file_groups = groups
+
+        if phil_in.headers is None:
+            phil_in.headers = os.path.splitext(phil_in.output)[0]+'.hdr'
+
+        self.header_file = phil_in.headers
+
         self.set_group_geometries()
         if phil_in.prefix == 'time':
             self.sort_by_time()
@@ -323,8 +403,16 @@ class ImportFiles:
 
         assert isinstance(phil_in, phil.scope_extract)
 
-        self.file_groups = phil_files.format(phil_in).extract().group
-        self.read_headers()
+        self.file_scope = phil_files.format(phil_in).extract()
+        if self.header_file is not None:
+            if os.path.isfile(self.header_file):
+                self.read_headers_from_file()
+            else:
+                self.read_headers()
+                self.write_headers_to_file()
+        else:
+            self.read_headers()
+
 
     def _is_file_key(self, key):
         """
@@ -450,12 +538,46 @@ class ImportFiles:
         '''
 
         try:
-            group_out = phil_files.extract()
-            group_out.group = self.file_groups
+            group_out = self.file_scope
             with open(file_out, 'w') as fiout:
                 phil_files.format(group_out).show(out=fiout)
         except PermissionError:
             aares.RuntimeErrorUser('Cannot write to {}. Permission denied.'.format(fiout))
+
+    def write_headers_to_file(self,file_out=None):
+        '''
+        Writes the object to a file
+        :param file_out:
+        :return:
+        '''
+
+        if file_out is None:
+            file_out = self.header_file
+        assert file_out is not None
+
+        try:
+            with open(file_out, 'wb') as fiout:
+                fiout.write(zlib.compress(pickle.dumps(self.files_dict)))
+        except PermissionError:
+            aares.RuntimeErrorUser('Cannot write to {}. Permission denied.'.format(file_out))
+
+    def read_headers_from_file(self,file_in=None):
+        '''
+        Reads the serialized headers from a file
+        :param file_in:
+        :return:
+        '''
+
+        if file_in is None:
+            file_in = self.header_file
+        assert file_in is not None
+
+        try:
+            with open(file_in, 'rb') as fiin:
+                self.files_dict = pickle.loads(zlib.decompress(fiin.read()))
+        except PermissionError:
+            aares.RuntimeErrorUser('Cannot write to {}. Permission denied.'.format(file_in))
+
 
 
 class JobImport(aares.Job):
@@ -479,7 +601,21 @@ class JobImport(aares.Job):
         :return:
         '''
 
-        run = ImportFiles(self.params.to_import)
+        if not is_fls(self.params.to_import.output):
+            logging.warning('The file extension should be ".fls". Different extension might cause troubles.')
+
+        if len(self.params.to_import.input_file) > 0:
+            file_phils = [phil.parse(file_name=fi) for fi in self.params.to_import.input_file]
+            file_scope = phil_files.fetch(sources=file_phils)
+            aares.my_print('Reading headers...')
+            run = ImportFiles(file_phil=file_scope)
+
+#            run.read_headers()
+            if self.params.to_import.headers is None:
+                 self.params.to_import.headers = os.path.splitext(self.params.to_import.output)[0]+'.hdr'
+            run.header_file = self.params.to_import.headers
+        else:
+            run = ImportFiles(self.params.to_import)
 
         files = phil_files.format(run.file_groups)
         #       print(files.as_str(expert_level=0))
@@ -487,6 +623,11 @@ class JobImport(aares.Job):
             run.write_groups(self.params.to_import.output)
 
             aares.my_print('List of imported files was written to: {}'.format(self.params.to_import.output))
+
+        if run.header_file is not None:
+            run.write_headers_to_file()
+            aares.my_print(
+                'Parsed headers of data files are saved to: {}'.format(run.header_file))
 
         pass
 
@@ -509,6 +650,16 @@ class JobImport(aares.Job):
 
         :return:
         '''
+
+        aares_files = [fi for fi in self.unhandled if is_fls(fi)]
+
+        if len(aares_files) > 0:
+            if self.params.to_import.input_file is None:
+                self.params.to_import.input_file = []
+            self.params.to_import.input_file.extend(aares_files)
+
+            for fi in self.params.to_import.input_file:
+                self.unhandled.remove(fi)
         self.params.to_import.search_string.extend(self.unhandled)
 
     def __help_epilog__(self):
