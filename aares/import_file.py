@@ -18,7 +18,8 @@ import logging
 __all__ = []
 __version__ = aares.__version__
 
-from aares.datafiles import phil_files, is_fls
+import aares.datafiles #import phil_files, is_fls
+#from aares.datafiles import DataFilesCarrier
 import freephil as phil
 import os
 
@@ -90,23 +91,23 @@ class JobImport(aares.Job):
         :return:
         '''
 
-        if not is_fls(self.params.to_import.output):
+        if not aares.datafiles.is_fls(self.params.to_import.output):
             logging.warning('The file extension should be ".fls". Different extension might cause troubles.')
 
         if len(self.params.to_import.input_file) > 0:
             file_phils = [phil.parse(file_name=fi) for fi in self.params.to_import.input_file]
-            file_scope = phil_files.fetch(sources=file_phils)
+            file_scope = aares.datafiles.phil_files.fetch(sources=file_phils)
             aares.my_print('Reading headers...')
-            run = DataFilesCarrier(file_phil=file_scope)
+            run = aares.datafiles.DataFilesCarrier(file_phil=file_scope)
 
 #            run.read_headers()
             if self.params.to_import.headers is None:
                  self.params.to_import.headers = os.path.splitext(self.params.to_import.output)[0]+'.hdr'
             run.header_file = self.params.to_import.headers
         else:
-            run = DataFilesCarrier(self.params.to_import)
+            run = aares.datafiles.DataFilesCarrier(self.params.to_import)
 
-        files = phil_files.format(run.file_groups)
+        files = aares.datafiles.phil_files.format(run.file_groups)
         #       print(files.as_str(expert_level=0))
         if self.params.to_import.output is not None:
             run.write_groups(self.params.to_import.output)
@@ -140,7 +141,7 @@ class JobImport(aares.Job):
         :return:
         '''
 
-        aares_files = [fi for fi in self.unhandled if is_fls(fi)]
+        aares_files = [fi for fi in self.unhandled if aares.datafiles.is_fls(fi)]
 
         if len(aares_files) > 0:
             if self.params.to_import.input_file is None:

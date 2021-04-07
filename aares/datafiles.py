@@ -12,6 +12,194 @@ import h5z
 from aares import power as pwr
 from aares.import_file import phil_core
 
+phil_files = phil.parse('''
+headers = None
+.type = path
+.help = File storing parsed headers. If the file is not present, headers are read from the original data files.
+
+group 
+.multiple = True
+.help = Group of files with the same geometry header
+.expert_level = 0
+{
+    name = None
+    .expert_level = 0
+    .help = Name of the group
+    .type = str
+
+    geometry = None
+    .type = path
+    .help = File with geometry description. Special PHIL file, or H5 with correct header
+    .expert_level = 3
+
+    mask = None
+    .type = path
+    .help = File with the mask to be used.
+    .expert_level = 0
+
+    file 
+    .multiple = True
+    .help = A file in the group
+    {
+        path = None
+        .type = path
+        .help = Location of the file. This is required parameter of the "file"
+
+        name = None
+        .type = str
+        .help = String which is used as a reference for the file elsewhere. It has to be unique string.
+    }
+
+}
+''')
+
+
+def longest_common(list_strings, sep='_'):
+    """
+    Splits strings by `sep`, and return the common sections
+
+    :param str1:
+    :param str2:
+    :return:
+    """
+
+    strips = [string.split(sep) for string in list_strings]
+
+    unique = {key: '' for key in itertools.chain.from_iterable(strips)}
+
+    common = []
+
+    for key in unique.keys():
+        if all([key in strp for strp in strips]):
+            common.append(key)
+    return common
+
+
+def group_object(files=[], name=None):
+    '''
+    Returns empty Group scope_extract
+    :return:
+    '''
+
+    pe = phil_files.extract()
+    gr = pe.group.pop()
+    gr.file.pop()
+
+    gr.file.extend(files)
+    gr.name = name
+
+    return gr
+
+
+def file_object(path=None, name=None):
+    '''
+    Returns empty File scope_extract
+    :return:
+    '''
+
+    pe = phil_files.extract()
+    fo = pe.group[0].file.pop()
+    fo.path = path
+    fo.name = name
+    return fo
+
+
+def search_files(indir, suffix):
+    fiout = []
+    for root, dirs, files in os.walk(indir):
+        for file in files:
+            if file.endswith(suffix):
+                fiout.append(os.path.join(root, file))
+    return fiout
+
+
+def get_files(inpaths, suffixes):
+    if isinstance(suffixes, str):
+        suffixes = [suffixes]
+
+    for i, suf in enumerate(suffixes):
+        if not (suf[0] == '.'):
+            suffixes[i] = '.' + suf
+
+    files = [[file for file in glob.glob(fi)] for fi in inpaths]
+    inpaths = [fi for fi in itertools.chain.from_iterable(files)]
+    file_list = []
+    for fi in inpaths:
+        if os.path.isdir(fi):
+            for suf in suffixes:
+                file_list.extend(search_files(fi, suf))
+        else:
+            file_list.append(fi)
+    return file_list
+
+
+def files_to_groups(files, headers_to_match='entry/instrument/detector', ignore_merged=True):
+    """
+    Split the files in the groups based on common headers.
+
+    :param files: list of files to be distributed
+    :param headers_to_match: List of headers, which has to match, for files to consider similar
+    :param ignore_merged: If True, merged files will be ignored
+    :return:
+    """
+    groups = []
+    if isinstance(headers_to_match, str):
+        headers_to_match = [headers_to_match]
+
+    if not isinstance(files, dict):
+        files = pwr.get_headers_dict(files)
+
+    group_id = 1
+
+    for fi, hd in files.items():
+        if is_merged(hd) and ignore_merged:
+            continue
+
+        file_scope = file_object(path=fi)
+
+        for group in groups:
+            if all(hd[match] == files[group.file[0].path][match] for match in headers_to_match):
+                group.file.append(file_scope)
+                break
+        else:
+            groups.append(group_object([file_scope], name='group{:03d}'.format(group_id)))
+            group_id += 1
+
+    return groups
+
+
+def is_merged(file_in):
+    '''
+    Checkes, whether the file is average of multiple frames
+    :param file_in: header or file name
+    :type  file_in: h5z.SaxspointH5 or string
+    :return:
+    '''
+
+    if isinstance(file_in, str):
+        try:
+            file_in = h5z.SaxspointH5(file_in)
+        except:
+            raise IOError('Wrong or missing file: {}'.format(file_in))
+
+    try:
+        avr = file_in['entry/data/averaged_frames']
+        return True
+    except KeyError:
+        return False
+
+
+def is_fls(fi):
+    '''
+    Checks if the file is AAres PHIL file
+    :param fi:
+    :return:
+    '''
+
+    if fi.endswith('.fls'):
+        return True
+    else:
+        return False
 
 class FileHeadersDictionary(dict):
     '''
@@ -340,191 +528,3 @@ class DataFilesCarrier:
             aares.RuntimeErrorUser('Cannot write to {}. Permission denied.'.format(file_in))
 
 
-phil_files = phil.parse('''
-headers = None
-.type = path
-.help = File storing parsed headers. If the file is not present, headers are read from the original data files.
-
-group 
-.multiple = True
-.help = Group of files with the same geometry header
-.expert_level = 0
-{
-    name = None
-    .expert_level = 0
-    .help = Name of the group
-    .type = str
-    
-    geometry = None
-    .type = path
-    .help = File with geometry description. Special PHIL file, or H5 with correct header
-    .expert_level = 3
-    
-    mask = None
-    .type = path
-    .help = File with the mask to be used.
-    .expert_level = 0
-    
-    file 
-    .multiple = True
-    .help = A file in the group
-    {
-        path = None
-        .type = path
-        .help = Location of the file. This is required parameter of the "file"
-        
-        name = None
-        .type = str
-        .help = String which is used as a reference for the file elsewhere. It has to be unique string.
-    }
-    
-}
-''')
-
-
-def longest_common(list_strings, sep='_'):
-    """
-    Splits strings by `sep`, and return the common sections
-
-    :param str1:
-    :param str2:
-    :return:
-    """
-
-    strips = [string.split(sep) for string in list_strings]
-
-    unique = { key : '' for key in itertools.chain.from_iterable(strips)}
-
-    common = []
-
-    for key in unique.keys():
-        if all([key in strp for strp in strips ]):
-            common.append(key)
-    return common
-
-
-def group_object(files=[], name=None):
-    '''
-    Returns empty Group scope_extract
-    :return:
-    '''
-
-    pe = phil_files.extract()
-    gr = pe.group.pop()
-    gr.file.pop()
-
-    gr.file.extend(files)
-    gr.name = name
-
-    return gr
-
-
-def file_object(path=None, name=None):
-    '''
-    Returns empty File scope_extract
-    :return:
-    '''
-
-    pe = phil_files.extract()
-    fo = pe.group[0].file.pop()
-    fo.path = path
-    fo.name = name
-    return fo
-
-
-def search_files(indir, suffix):
-    fiout = []
-    for root, dirs, files in os.walk(indir):
-        for file in files:
-            if file.endswith(suffix):
-                fiout.append(os.path.join(root, file))
-    return fiout
-
-
-def get_files(inpaths, suffixes):
-    if isinstance(suffixes, str):
-        suffixes = [suffixes]
-
-    for i, suf in enumerate(suffixes):
-        if not (suf[0] == '.'):
-            suffixes[i] = '.' + suf
-
-    files = [[file for file in glob.glob(fi)] for fi in inpaths]
-    inpaths = [fi for fi in itertools.chain.from_iterable(files)]
-    file_list = []
-    for fi in inpaths:
-        if os.path.isdir(fi):
-            for suf in suffixes:
-                file_list.extend(search_files(fi, suf))
-        else:
-            file_list.append(fi)
-    return file_list
-
-
-def files_to_groups(files, headers_to_match='entry/instrument/detector', ignore_merged=True):
-    """
-    Split the files in the groups based on common headers.
-
-    :param files: list of files to be distributed
-    :param headers_to_match: List of headers, which has to match, for files to consider similar
-    :param ignore_merged: If True, merged files will be ignored
-    :return:
-    """
-    groups = []
-    if isinstance(headers_to_match, str):
-        headers_to_match = [headers_to_match]
-
-    if not isinstance(files, dict):
-        files = pwr.get_headers_dict(files)
-
-    group_id = 1
-
-    for fi, hd in files.items():
-        if is_merged(hd) and ignore_merged:
-            continue
-
-        file_scope = file_object(path=fi)
-
-        for group in groups:
-            if all(hd[match] == files[group.file[0].path][match] for match in headers_to_match):
-                group.file.append(file_scope)
-                break
-        else:
-            groups.append(group_object([file_scope], name='group{:03d}'.format(group_id)))
-            group_id += 1
-
-    return groups
-
-
-def is_merged(file_in):
-    '''
-    Checkes, whether the file is average of multiple frames
-    :param file_in: header or file name
-    :type  file_in: h5z.SaxspointH5 or string
-    :return:
-    '''
-
-    if isinstance(file_in, str):
-        try:
-            file_in = h5z.SaxspointH5(file_in)
-        except:
-            raise IOError('Wrong or missing file: {}'.format(file_in))
-
-    try:
-        file_in['entry/data/averaged_frames']
-        return True
-    except KeyError:
-        return False
-
-
-def is_fls(fi):
-    '''
-    Checks if the file is AAres PHIL file
-    :param fi:
-    :return:
-    '''
-
-    if fi.endswith('.fls'):
-        return True
-    else:
-        return False

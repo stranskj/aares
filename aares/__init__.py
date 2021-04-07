@@ -6,10 +6,12 @@ import logging
 import logging.config
 from .version import version
 import freephil as phil
-
-from aares.datafiles import DataFilesCarrier
-
 __version__ = version
+
+#from aares.datafiles import DataFilesCarrier
+#import aares.datafiles
+
+#DataFilesCarrier = aares.datafiles.DataFilesCarrier
 
 __license__ = '''
     This program is free software: you can redistribute it and/or modify
