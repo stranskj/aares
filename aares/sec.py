@@ -1,6 +1,8 @@
 import aares
 import sys,os
 import freephil as phil
+
+import aares.datafiles
 import aares.import_file
 import aares.q_transformation as q_trans
 import aares.mask
@@ -109,11 +111,11 @@ def run(params):
   #  params.input_files = params.to_import.input_files
     if params.input_files is not None:
         aares.my_print('Reading file headers...')
-        files = aares.import_file.ImportFiles(file_phil=params.input_files)
+        files = aares.DataFilesCarrier(file_phil=params.input_files)
         aares.my_print('Processed {} files.'.format(len(files.files_dict)))
     else:
         aares.my_print('Importing files...')
-        files = aares.import_file.ImportFiles(run_phil=params.to_import)
+        files = aares.DataFilesCarrier(run_phil=params.to_import)
         aares.my_print('Processed {} files.'.format(len(files.files_dict)))
         aares.my_print('Writing list of imported files to {}.'.format(params.to_import.output))
         files.write_groups(params.to_import.output)
@@ -275,7 +277,7 @@ class JobSec(aares.Job):
 
         :return:
         '''
-        aares_files = [fi for fi in self.unhandled if aares.import_file.is_fls(fi)]
+        aares_files = [fi for fi in self.unhandled if aares.datafiles.is_fls(fi)]
 
         if len(aares_files) > 0:
             if self.params.input_files is None:

@@ -7,6 +7,8 @@ import logging.config
 from .version import version
 import freephil as phil
 
+from aares.datafiles import DataFilesCarrier
+
 __version__ = version
 
 __license__ = '''
