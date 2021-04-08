@@ -17,10 +17,12 @@ from zipfile import ZipFile
 import zipfile
 import h5py
 import os
+from abc import ABC, abstractmethod
 import logging
 #from saxspoint import my_print
 import copy
 import numpy as np
+
 
 
 @contextmanager
@@ -314,11 +316,75 @@ class GroupH5(dict):
 
         return  super().__eq__(other) and attr_bool
 
-
-
-class SaxspointH5():
+class InstrumentFileH5(ABC):
     """
-    A class holding informations on a H5Z file (header snippet). Uses H5-style dictionary
+    Abstract class describing generic H5-like files to be used as files containing data
+    """
+    @property
+    @abstractmethod
+    def geometry_fields(self):
+        '''
+        List of items, which defines geometry of the instrument. These items are used for determining, if geometries of two experiments are the same.
+        :return: list
+        '''
+        return []
+
+    @property
+    @abstractmethod
+    def skip_entries(self):
+        '''
+        List of items not read from the file at the time of object creation.
+        :return: list
+        '''
+        return []
+
+    def __getitem__(self, key):
+        if key in self.skip_entries:
+            with FileH5Z(self.abs_path,'r') as h5f:
+                val = ItemH5(h5f[key])
+        else:
+            val = self._h5[key]
+        return val
+
+    def __setitem__(self, key, value):
+        self._h5[key] = value
+
+    @property
+    def _h5(self):
+        try:
+            val = self.__h5
+        except AttributeError:
+            val = GroupH5()
+            self.__h5 = val
+        return val
+
+    @_h5.setter
+    def _h5(self,val):
+        self.__h5 = val
+
+    @property
+    def attrs(self):
+        return self._h5.attrs
+
+    def read_header(self, path=None, **filters):
+        #TODO: create as constructor option; store in member variable, if one of those attempted to read later, reopen the file
+
+        if path is None:
+            try:
+                path = self.attrs['abs_path']
+            except AttributeError:
+                raise AttributeError('Path to the file was not given or set.')
+        #TODO : handle missing/wrong file exceptions
+        with FileH5Z(path, 'r', **filters) as h5z:
+            # walk(h5z, self._h5, skip=skip_entries, **filters)
+            # for key, val in h5z.attrs.items():
+            #    self.attrs[key] = val
+            self._h5 = GroupH5(h5z, exclude=self.skip_entries)
+
+
+class SaxspointH5(InstrumentFileH5):
+    """
+    A class holding information on a H5Z file (header snippet). Uses H5-style dictionary
 
     Note, that this might be extended, as projects progresses
 
@@ -350,44 +416,19 @@ class SaxspointH5():
     ]
 
     def __init__(self, path):
+        '''
+
+        :param path: Path to the file to be read into the object
+        '''
         # self.__temp = tempfile.TemporaryFile()
-        # self.__h5 = h5py.File(self.__temp, 'a')
-        # self.__h5
+        # self._h5 = h5py.File(self.__temp, 'a')
+        # self._h5
 
         self.read_header(path)
 
         self.attrs['path'] = path
         self.attrs['abs_path'] = os.path.abspath(self.attrs['path'])
 
-    def __getitem__(self, key):
-        if key in self.skip_entries:
-            with FileH5Z(self.abs_path,'r') as h5f:
-                val = ItemH5(h5f[key])
-        else:
-            val = self.__h5[key]
-        return val
-
-    def __setitem__(self, key, value):
-        self.__h5[key] = value
-
-    @property
-    def attrs(self):
-        return self.__h5.attrs
-
-    def read_header(self, path=None, **filters):
-        #TODO: create as constructor option; store in member variable, if one of those attempted to read later, reopen the file
-
-        if path is None:
-            try:
-                path = self.attrs['abs_path']
-            except AttributeError:
-                raise AttributeError('Path to the file was not given or set.')
-        #TODO : handle missing/wrong file exceptions
-        with FileH5Z(path, 'r', **filters) as h5z:
-            # walk(h5z, self.__h5, skip=skip_entries, **filters)
-            # for key, val in h5z.attrs.items():
-            #    self.attrs[key] = val
-            self.__h5 = GroupH5(h5z, exclude=self.skip_entries)
 
     @property
     def sample_name(self):
@@ -455,7 +496,7 @@ class SaxspointH5():
     @property
     def file_time_iso(self):
         """
-        File_time string in isoformat in micorseconds
+        File_time string in isoformat in microseconds
         """
         tm = self.attrs['file_time'].decode()
 
