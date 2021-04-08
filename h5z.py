@@ -244,6 +244,20 @@ class DatasetH5(np.ndarray):
     def __getitem__(self, item):
         return np.array(super().__getitem__(item))
 
+    def write(self, parent, bigger_than = 100, compression = 'gzip', **kwargs):
+        '''
+        Function used for writing the group to the H5 file
+        :param parent: Parent group to be saved in
+        :return: True if success
+        '''
+
+        if self.size < bigger_than:
+            compression = None
+
+        dset = parent.create_dataset(self.name, data=self, compression=compression, **kwargs)
+        dset.attrs.update(self.attrs)
+
+
 def ItemH5(item_in):
     """
     Reads in item from the file, and returns it. It is generic wrapper for reading GroupH5 and DatasetH5
@@ -282,7 +296,7 @@ class GroupH5(dict):
                 elif isinstance(obj, h5py.Dataset):
                     self[key] = DatasetH5(source_dataset=obj)
                 else:
-                    raise TypeError('Unknown HDF5 element type: {}'.format())
+                    raise TypeError('Unknown HDF5 element type: {}'.format(type(obj)))
             for key, val in source_group.attrs.items():
                 self.attrs[key] = copy.copy(val)
             # self.__dict__.update(source_group.__dict__)
@@ -333,6 +347,21 @@ class GroupH5(dict):
             attr_bool = False
 
         return  super().__eq__(other) and attr_bool
+
+    def write(self, parent, **kwargs):
+        '''
+        Function used for writing the group to the H5 file
+        :param parent: Parent group to be saved in
+        :return: True if success
+        '''
+
+        try:
+            me_h5 = parent.create_group(self.name)
+        except ValueError:
+            me_h5 = parent[self.name]
+        me_h5.attrs.update(self.attrs)
+        for key, val in self.items():
+            val.write(me_h5, **kwargs)
 
 class InstrumentFileH5(ABC):
     """
@@ -398,6 +427,19 @@ class InstrumentFileH5(ABC):
             # for key, val in h5z.attrs.items():
             #    self.attrs[key] = val
             self._h5 = GroupH5(h5z, exclude=self.skip_entries)
+
+    def write(self, fout, mode='w', **kwargs):
+        '''
+        Write the object to H5 file
+
+        :param fout:
+        :param kwargs:
+        :return:
+        '''
+
+        with h5py.File(fout, mode=mode) as h5out:
+            h5out.attrs.update(self.attrs)
+            self._h5.write(h5out)
 
 
 class SaxspointH5(InstrumentFileH5):
