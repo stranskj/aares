@@ -428,7 +428,7 @@ class InstrumentFileH5(ABC):
             #    self.attrs[key] = val
             self._h5 = GroupH5(h5z, exclude=self.skip_entries)
 
-    def write(self, fout, mode='w', **kwargs):
+    def write(self, fout, mode='w', skipped=False, **kwargs):
         '''
         Write the object to H5 file
 
@@ -439,7 +439,10 @@ class InstrumentFileH5(ABC):
 
         with h5py.File(fout, mode=mode) as h5out:
             h5out.attrs.update(self.attrs)
-            self._h5.write(h5out)
+            self._h5.write(h5out, **kwargs)
+            if skipped:
+                for item in self.skip_entries:
+                    self[item].write(h5out, **kwargs)
 
 
 class SaxspointH5(InstrumentFileH5):
