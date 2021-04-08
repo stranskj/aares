@@ -235,12 +235,99 @@ def transform_detector_radial_q(header, beam = (0,0,1), unit='nm'):
 
     return arrQ
 
+
+class ArrayQ(h5z.InstrumentFileH5):
+    '''
+    Detector surface transformed to Q-values
+    '''
+
+    skip_entries = []
+
+    def __init__(self, source=None):
+        '''
+        If header is provided, the geometry is read; if path to file is provided, the header is read from the file and then treated as such, or the is read from the file.
+
+        :param source: From where the data should be acquiered/read?
+        :type source: NoneType, or h5z.SaxspointH5, or path to h5z-file, or path to aares H5 file
+        '''
+
+        assert isinstance(source,h5z.SaxspointH5) or \
+               isinstance(source, str) or \
+               source is None
+
+        self._h5 = h5z.GroupH5()
+        self.geometry_fields = []
+
+        if isinstance(source, str):
+            if h5z.is_h5_file(source):
+                try:
+                    success = self.read_from_file(source)
+                except KeyError:
+                    success  = False
+                if not success:
+                    source = h5z.SaxspointH5(source)
+
+        if isinstance(source, h5z.SaxspointH5):
+            self.read_geometry(source)
+
+
+    def read_geometry(self, source):
+        '''
+        Reads geometry fields from the source header
+        :param source: Header object to be read from
+        :type source: h5z.SaxspointH5
+        :return:
+        '''
+
+        assert isinstance(source, h5z.SaxspointH5)
+
+        self.geometry_fields = copy.copy(source.geometry_fields)
+
+        for key in self.geometry_fields:
+            self[key] = copy.deepcopy(source[key])
+
+    def read_from_file(self, fin):
+        '''
+        Reads the data from a dedicated file
+        :param fin:
+        :return:
+        '''
+
+    def write_to_file(self, fout, mode='w'):
+        '''
+        Writes the array and geometry to the file.
+
+        :param fout:
+        :param mode:
+        :return:
+        '''
+
+    @property
+    def geometry_fields(self):
+        try:
+            val = self._geometry_fields
+        except AttributeError:
+            val = []
+            self._geometry_fields = val
+        return val
+
+    @geometry_fields.setter
+    def geometry_fields(self, val):
+        self._geometry_fields = val
+
+
 def test(fin):
 
     import time
     import matplotlib.pyplot as plt
 
     h5in = h5z.SaxspointH5(fin)
+
+    h5in.write('test_out.h5', skipped=True)
+
+    cArrQ = ArrayQ(fin)
+
+    print(all(h5in[match] == cArrQ[match] for match in h5in.geometry_fields))
 
     a = numpy.array([[1,2,3],
                      [4,5,6],
@@ -283,7 +370,7 @@ def test(fin):
     pass
 
 def main():
-    test('data/AgBeh_826mm.h5z')
+    test('../data/AgBeh_826mm.h5z')
 
 
 
