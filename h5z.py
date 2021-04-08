@@ -303,6 +303,24 @@ class GroupH5(dict):
         except KeyError:
             raise KeyError('Entry does not exsist: {}'.format(key))
 
+    def __setitem__(self, key, value):
+        """
+        Enables getting items to nested dictionaries, with syntax like: group5['/foo/bar/foobar']
+        """
+        split_key = key.strip('/').split('/', maxsplit=1)
+
+        if split_key == ['']:
+            raise KeyError
+        elif len(split_key) == 1:
+            dict.__setitem__(self, split_key[0],value)
+        else:
+            if split_key[0] not in self:
+                dict.__setitem__(self, split_key[0], GroupH5())
+            if not isinstance(self[split_key[0]], GroupH5):
+                raise KeyError('The existing key cannot be extended, because it is not GroupH5 object. "{}"'.format(key))
+
+            self[split_key[0]][split_key[1]] = value
+
     def __eq__(self, other):
         if not (isinstance(other, GroupH5) or isinstance(other,h5py.Group)):
             # don't attempt to compare against unrelated types
