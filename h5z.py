@@ -283,8 +283,12 @@ class GroupH5(dict):
     The class mimiks h5py.Group, however, the feature set might not be complete and it can evolve with the project.
     """
 
-    def __init__(self, source_group=None, exclude=[]):
+    def __init__(self, source_group=None, name=None, exclude=None):
+        if exclude is None:
+            exclude = []
+
         self.attrs = {}
+        self.name = name
         if (isinstance(source_group, h5py.Group) or
                 isinstance(source_group, GroupH5) or
                 isinstance(source_group, h5py.File)):
@@ -292,7 +296,7 @@ class GroupH5(dict):
                 if obj.name.strip('/') in exclude:
                     continue
                 elif isinstance(obj, h5py.Group):
-                    self[key] = GroupH5(obj, exclude)
+                    self[key] = GroupH5(obj, exclude=exclude)
                 elif isinstance(obj, h5py.Dataset):
                     self[key] = DatasetH5(source_dataset=obj)
                 else:
@@ -451,7 +455,10 @@ class InstrumentFileH5(ABC):
             self._h5.write(h5out, **kwargs)
             if skipped:
                 for item in self.skip_entries:
-                    self[item].write(h5out, **kwargs)
+                    try:
+                        self[item].write(h5out, **kwargs)
+                    except ValueError:
+                        pass
 
 
 class SaxspointH5(InstrumentFileH5):
