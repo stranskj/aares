@@ -2,8 +2,7 @@ import glob
 import itertools
 import math
 import os
-import pickle
-import zlib
+import logging
 
 import freephil as phil
 
@@ -232,6 +231,7 @@ class DataFilesCarrier:
     :ivar file_groups: Files ordered into the groups (phil.scope_extract)
     :ivar file_scope: Full phil.scope_extract of phil_files
     """
+
 
     def __init__(self, run_phil=None, file_phil=None, nproc=None):
         """
@@ -480,7 +480,7 @@ class DataFilesCarrier:
         self.files_dict = sorted_dict
 
 
-    def write_groups(self,file_out='files.phil'):
+    def write_groups(self,file_out='files.fls'):
         '''
         Write the file groups to a file
         :return:
@@ -499,14 +499,29 @@ class DataFilesCarrier:
         :param file_out:
         :return:
         '''
+        import h5py
 
         if file_out is None:
             file_out = self.header_file
         assert file_out is not None
 
+        master_group = h5z.GroupH5()
+        master_group['file_headers'] = h5z.GroupH5()
+
+        i = 0
+        digit = int(math.log10(len(self.files_dict))) + 1
+        for name, header in self.files_dict.items():
+            key =str(i).zfill(digit)
+            master_group['file_headers/'+key] = header._h5
+            i += 1
+
+        master_group.attrs['aares_file_type'] = 'data_file_headers'
+  #      master_group.attrs['aares_version'] = aares.version
+    # TODO: verze se nevraci jako string
+    # FAILING: jednotlive sub Groupy maji spatne jmeno, protoze nejsou zalozene na tomto...
         try:
-            with open(file_out, 'wb') as fiout:
-                fiout.write(zlib.compress(pickle.dumps(self.files_dict)))
+            with h5py.File(file_out, 'w') as fiout:
+                master_group.write(fiout, compression='gzip')
         except PermissionError:
             aares.RuntimeErrorUser('Cannot write to {}. Permission denied.'.format(file_out))
 
@@ -516,15 +531,23 @@ class DataFilesCarrier:
         :param file_in:
         :return:
         '''
+        import h5py
 
         if file_in is None:
             file_in = self.header_file
         assert file_in is not None
 
         try:
-            with open(file_in, 'rb') as fiin:
-                self.files_dict = pickle.loads(zlib.decompress(fiin.read()))
-        except PermissionError:
-            aares.RuntimeErrorUser('Cannot write to {}. Permission denied.'.format(file_in))
+            with h5py.File(file_in, 'w') as fiout:
+                if not fiout.attrs['aares_file_type'] == 'data_file_headers':
+                    raise OSError
+                if not fiout.attrs['aares_version'] == aares.version:
+                    logging.warning('AAres version used and of the file does not match.')
+
+                for name, header in fiout:
+                    self.files_dict[name] = h5z.SaxspointH5(header)
+
+        except OSError or KeyError or TypeError:
+            raise OSError('File is not of correct format or type: {}'.format(file_in))
 
 
