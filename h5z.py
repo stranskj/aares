@@ -385,6 +385,15 @@ class InstrumentFileH5(ABC):
         '''
         return []
 
+    @abstractmethod
+    def is_type(self,val):
+        '''
+        Method, which checks, if the item is of the proper type
+
+        :return: bool
+        '''
+        return True
+
     def __getitem__(self, key):
         if key in self.skip_entries:
             with FileH5Z(self.abs_path,'r') as h5f:
@@ -487,10 +496,41 @@ class SaxspointH5(InstrumentFileH5):
         # self._h5 = h5py.File(self.__temp, 'a')
         # self._h5
 
-        self.read_header(path)
+        if not self.is_type(path):
+            raise TypeError('Input is not compatible with SaxspointH5 class.')
 
-        self.attrs['path'] = path
-        self.attrs['abs_path'] = os.path.abspath(self.attrs['path'])
+        if is_h5_file(path):
+            self.read_header(path)
+
+            self.attrs['path'] = path
+            self.attrs['abs_path'] = os.path.abspath(self.attrs['path'])
+        elif isinstance(path, GroupH5) or isinstance(path,h5py.Group):
+            self._h5 = GroupH5(path)
+        else:
+            raise TypeError
+
+    def is_type(self,val):
+        '''
+        Checks for attributes to validate SAXSpoint
+        '''
+        attributes = {}
+        if is_h5_file(val):
+            with  FileH5Z(val, 'r') as fin:
+                attributes.update(fin.attrs)
+        elif isinstance(val, GroupH5) or isinstance(val,h5py.Group):
+            attributes.update(val.attrs)
+        else:
+            raise TypeError('Input should be h5py.Group-like object.')
+
+        try:
+            if 'saxsdrive' in attributes['creator'].decode().lower():
+                out = True
+            else:
+                out = False
+        except KeyError:
+            out = False
+
+        return out
 
 
     @property
