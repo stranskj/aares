@@ -1,3 +1,4 @@
+import copy
 import glob
 import itertools
 import math
@@ -501,24 +502,36 @@ class DataFilesCarrier:
         '''
         import h5py
 
+        master_group_name = '/file_headers'
+
         if file_out is None:
             file_out = self.header_file
         assert file_out is not None
 
-        master_group = h5z.GroupH5()
-        master_group['file_headers'] = h5z.GroupH5()
+        master_group = h5z.GroupH5(name='/')
+        master_group[master_group_name] = h5z.GroupH5(name=master_group_name)
 
         i = 0
         digit = int(math.log10(len(self.files_dict))) + 1
         for name, header in self.files_dict.items():
             key =str(i).zfill(digit)
-            master_group['file_headers/'+key] = header._h5
+            header_out = copy.deepcopy(header)
+            master_group[master_group_name + '/' + key] = header_out._h5
+            entry = master_group[master_group_name + '/' + key]
+            entry.name = master_group_name + '/' + key
+            for it_key in entry.walk():
+                new_key = master_group_name + '/' + key +  entry[it_key].name
+                entry[it_key].name = new_key
+
+
             i += 1
 
         master_group.attrs['aares_file_type'] = 'data_file_headers'
   #      master_group.attrs['aares_version'] = aares.version
     # TODO: verze se nevraci jako string
-    # FAILING: jednotlive sub Groupy maji spatne jmeno, protoze nejsou zalozene na tomto...
+        list_ms = master_group.walk()
+        pass
+
         try:
             with h5py.File(file_out, 'w') as fiout:
                 master_group.write(fiout, compression='gzip')
