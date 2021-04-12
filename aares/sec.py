@@ -111,11 +111,11 @@ def run(params):
   #  params.input_files = params.to_import.input_files
     if params.input_files is not None:
         aares.my_print('Reading file headers...')
-        files = aares.DataFilesCarrier(file_phil=params.input_files)
+        files = aares.datafiles.DataFilesCarrier(file_phil=params.input_files)
         aares.my_print('Processed {} files.'.format(len(files.files_dict)))
     else:
         aares.my_print('Importing files...')
-        files = aares.DataFilesCarrier(run_phil=params.to_import)
+        files = aares.datafiles.DataFilesCarrier(run_phil=params.to_import)
         aares.my_print('Processed {} files.'.format(len(files.files_dict)))
         aares.my_print('Writing list of imported files to {}.'.format(params.to_import.output))
         files.write_groups(params.to_import.output)
