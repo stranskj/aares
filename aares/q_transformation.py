@@ -4,6 +4,7 @@ import math
 import copy
 import aares.power as pwr
 import aares
+import logging
 import freephil as phil
 
 phil_core = phil.parse('''
@@ -255,19 +256,21 @@ class ArrayQ(h5z.InstrumentFileH5):
                isinstance(source, str) or \
                source is None
 
-        self._h5 = h5z.GroupH5()
+        self._h5 = h5z.GroupH5(name='/')
         self.geometry_fields = []
+        self.attrs['aares_version'] = str(aares.version)
+        self.attrs['aares_file_type'] = 'q_space'
 
         if isinstance(source, str):
             if h5z.is_h5_file(source):
-                try:
-                    success = self.read_from_file(source)
-                except KeyError:
-                    success  = False
-                if not success:
+                if self.is_type(source):
+                    self.read_from_file(source)
+                else:
                     source = h5z.SaxspointH5(source)
 
         if isinstance(source, h5z.SaxspointH5):
+            self.attrs['aares_version'] = str(aares.version)
+            self.attrs['aares_detector_class'] = 'SaxspointH5'
             self.read_geometry(source)
 
 
@@ -292,6 +295,10 @@ class ArrayQ(h5z.InstrumentFileH5):
         :param fin:
         :return:
         '''
+        self.read_header(fin)
+        self.geometry_fields = self['entry'].walk()
+        if not self.attrs['aares_version'] == str(aares.version):
+            logging.warning('AAres version used and of the file does not match.')
 
     def write_to_file(self, fout, mode='w'):
         '''
@@ -301,6 +308,8 @@ class ArrayQ(h5z.InstrumentFileH5):
         :param mode:
         :return:
         '''
+
+        self.write(fout, mode=mode, compression='gzip')
 
     @property
     def geometry_fields(self):
@@ -322,25 +331,30 @@ class ArrayQ(h5z.InstrumentFileH5):
         :return: bool
         '''
         import h5z, h5py
-
+        out = []
         attributes = {}
         if h5z.is_h5_file(val):
             with h5z.FileH5Z(val, 'r') as fin:
                 attributes.update(fin.attrs)
-        elif isinstance(val, h5z.GroupH5) or isinstance(val,h5py.Group):
-            attributes.update(val.attrs)
+                # if all([fin.get(it, default=False) == True for it in['/processing/q-vector/length']]):
+                #     out.append(True)
+                # else:
+                #     out.append(False)
+#        elif isinstance(val, h5z.GroupH5) or isinstance(val,h5py.Group):
+#            attributes.update(val.attrs)
         else:
-            raise TypeError('Input should be h5py.Group-like object.')
+            raise TypeError('Input should be h5a file.')
 
         try:
-            if 'saxsdrive' in attributes['creator'].decode().lower():
-                out = True
-            else:
-                out = False
-        except KeyError:
-            out = False
+            out.extend(['aares_detector_class' in attributes,
+                    attributes['aares_file_type'] == 'q_space'])
 
-        return out
+            if not attributes['aares_version'] == str(aares.version):
+                    logging.warning('AAres version used and of the file does not match.')
+        except KeyError:
+            out.append(False)
+
+        return all(out)
 
 
 def test(fin):
@@ -354,6 +368,9 @@ def test(fin):
 
     cArrQ = ArrayQ(fin)
 
+    cArrQ.write_to_file('q-r.h5')
+
+    cArrQ2 = ArrayQ('q-r.h5')
     print(all(h5in[match] == cArrQ[match] for match in h5in.geometry_fields))
 
     a = numpy.array([[1,2,3],
