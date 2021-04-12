@@ -315,6 +315,33 @@ class ArrayQ(h5z.InstrumentFileH5):
     def geometry_fields(self, val):
         self._geometry_fields = val
 
+    def is_type(self,val):
+        '''
+        Check if the file is of the correct type.
+        :param val:
+        :return: bool
+        '''
+        import h5z, h5py
+
+        attributes = {}
+        if h5z.is_h5_file(val):
+            with h5z.FileH5Z(val, 'r') as fin:
+                attributes.update(fin.attrs)
+        elif isinstance(val, h5z.GroupH5) or isinstance(val,h5py.Group):
+            attributes.update(val.attrs)
+        else:
+            raise TypeError('Input should be h5py.Group-like object.')
+
+        try:
+            if 'saxsdrive' in attributes['creator'].decode().lower():
+                out = True
+            else:
+                out = False
+        except KeyError:
+            out = False
+
+        return out
+
 
 def test(fin):
 
@@ -323,7 +350,7 @@ def test(fin):
 
     h5in = h5z.SaxspointH5(fin)
 
-    h5in.write('test_out.h5', skipped=True)
+ #   h5in.write('test_out.h5', skipped=True)
 
     cArrQ = ArrayQ(fin)
 
