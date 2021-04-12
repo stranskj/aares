@@ -10,7 +10,7 @@ import freephil as phil
 import aares
 import h5z
 from aares import power as pwr
-from aares.import_file import phil_core
+
 
 phil_files = phil.parse('''
 headers = None
@@ -233,6 +233,7 @@ class DataFilesCarrier:
     :ivar file_scope: Full phil.scope_extract of phil_files
     """
 
+    _master_group_name = '/file_headers'
 
     def __init__(self, run_phil=None, file_phil=None, nproc=None):
         """
@@ -290,6 +291,7 @@ class DataFilesCarrier:
         Processes files using an input parameters in PHIL
         :return:
         """
+        from aares.import_file import phil_core
         try:
             phil_core.format(phil_in)
         except : #TODO: chceck what exception can actually occure
@@ -502,7 +504,7 @@ class DataFilesCarrier:
         '''
         import h5py
 
-        master_group_name = '/file_headers'
+        master_group_name = self._master_group_name
 
         if file_out is None:
             file_out = self.header_file
@@ -527,10 +529,8 @@ class DataFilesCarrier:
             i += 1
 
         master_group.attrs['aares_file_type'] = 'data_file_headers'
-  #      master_group.attrs['aares_version'] = aares.version
+        master_group.attrs['aares_version'] = str(aares.version)
     # TODO: verze se nevraci jako string
-        list_ms = master_group.walk()
-        pass
 
         try:
             with h5py.File(file_out, 'w') as fiout:
@@ -546,21 +546,28 @@ class DataFilesCarrier:
         '''
         import h5py
 
+
         if file_in is None:
             file_in = self.header_file
         assert file_in is not None
 
         try:
-            with h5py.File(file_in, 'w') as fiout:
-                if not fiout.attrs['aares_file_type'] == 'data_file_headers':
+            with h5py.File(file_in, 'r') as fiin:
+                if not fiin.attrs['aares_file_type'] == 'data_file_headers':
                     raise OSError
-                if not fiout.attrs['aares_version'] == aares.version:
+                if not fiin.attrs['aares_version'] == str(aares.version):
                     logging.warning('AAres version used and of the file does not match.')
 
-                for name, header in fiout:
-                    self.files_dict[name] = h5z.SaxspointH5(header)
+                input_group = h5z.GroupH5(fiin)
+
+            for key in input_group[self._master_group_name].walk():
+                assert key[0] == '/'
+                split_name = input_group[key].name.split('/')
+                input_group[key].name = '/' + '/'.join(split_name[3:])
 
         except OSError or KeyError or TypeError:
             raise OSError('File is not of correct format or type: {}'.format(file_in))
 
-
+        for item in input_group[self._master_group_name].values():
+            header = h5z.SaxspointH5(item)
+            self.files_dict[header.path] = header

@@ -525,16 +525,18 @@ class SaxspointH5(InstrumentFileH5):
         # self._h5 = h5py.File(self.__temp, 'a')
         # self._h5
 
-        if not self.is_type(path):
-            raise TypeError('Input is not compatible with SaxspointH5 class.')
-
-        if is_h5_file(path):
+        if isinstance(path, GroupH5):
+            self._h5 = copy.deepcopy(path)
+        elif isinstance(path, h5py.Group):
+            self._h5 = GroupH5(path)
+        elif is_h5_file(path):
+            if not self.is_type(path):
+                raise TypeError('Input is not compatible with SaxspointH5 class.')
             self.read_header(path)
 
             self.attrs['path'] = path
-            self.attrs['abs_path'] = os.path.abspath(self.attrs['path'])
-        elif isinstance(path, GroupH5) or isinstance(path,h5py.Group):
-            self._h5 = GroupH5(path)
+            self.update_abs_path()
+
         else:
             raise TypeError
 
@@ -561,6 +563,20 @@ class SaxspointH5(InstrumentFileH5):
 
         return out
 
+    def update_abs_path(self,abs_path = None):
+        '''
+        Updates abs_path entry. Based on "path", if intput is None
+        :param abs_path:
+        :return:
+        '''
+
+        if abs_path is not None:
+            self.abs_path = abs_path
+        else:
+            try:
+                self.abs_path = os.path.abspath(self.attrs['path'])
+            except OSError:
+                raise OSError('The data file does not exist: {}'.format(self.path))
 
     @property
     def sample_name(self):
@@ -649,6 +665,10 @@ class SaxspointH5(InstrumentFileH5):
         :return:
         """
         return self.attrs['path']
+    @path.setter
+    def path(self, val):
+        self.attrs['path'] = val
+
     @property
     def abs_path(self):
         """
@@ -656,7 +676,9 @@ class SaxspointH5(InstrumentFileH5):
         :return:
         """
         return self.attrs['abs_path']
-
+    @abs_path.setter
+    def abs_path(self, val):
+        self.attrs['abs_path'] = val
 
 def test_equal_Datasets():
     f1 = 'data/10x1s.h5'

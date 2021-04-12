@@ -95,17 +95,21 @@ class JobImport(aares.Job):
             logging.warning('The file extension should be ".fls". Different extension might cause troubles.')
 
         if len(self.params.to_import.input_file) > 0:
+            aares.my_print('Processing files based on content of file(s):')
+            for fi in self.params.to_import.input_file:
+                aares.my_print('\t' + fi)
             file_phils = [phil.parse(file_name=fi) for fi in self.params.to_import.input_file]
             file_scope = aares.datafiles.phil_files.fetch(sources=file_phils)
-            aares.my_print('Reading headers...')
+
+            aares.my_print('\nReading headers of data files...')
             run = aares.datafiles.DataFilesCarrier(file_phil=file_scope)
 
-#            run.read_headers()
+            run.read_headers() #Might be done for second time, is HDR-file originally exist...
             if self.params.to_import.headers is None:
                  self.params.to_import.headers = os.path.splitext(self.params.to_import.output)[0]+'.hdr'
             run.header_file = self.params.to_import.headers
         else:
-            run = aares.datafiles.DataFilesCarrier(self.params.to_import)
+            run = aares.datafiles.DataFilesCarrier(run_phil=self.params.to_import)
 
         files = aares.datafiles.phil_files.format(run.file_groups)
         #       print(files.as_str(expert_level=0))
