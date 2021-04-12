@@ -82,7 +82,7 @@ def copy_attributes(in_object, out_object):
         out_object.attrs[key] = value
 
 
-def walk(in_object, out_object, skip=[], __full_path='', log=False, **filters):
+def walk_compress(in_object, out_object, skip=[], __full_path='', log=False, **filters):
     """Recursively copy&compress the tree.
 
     If attributes cannot be transferred, a copy is created.
@@ -95,7 +95,7 @@ def walk(in_object, out_object, skip=[], __full_path='', log=False, **filters):
         elif not isinstance(in_obj, h5py.Datatype) and h5py_compatible_attributes(in_obj):
             if isinstance(in_obj, h5py.Group):
                 out_obj = out_object.create_group(key)
-                walk(in_obj, out_obj, skip=skip, log=log, **filters)
+                walk_compress(in_obj, out_obj, skip=skip, log=log, **filters)
                 if log:
                     _report("Copied", key, in_obj)
             elif isinstance(in_obj, h5py.Dataset):
@@ -367,6 +367,20 @@ class GroupH5(dict):
         for key, val in self.items():
             val.write(me_h5, **kwargs)
 
+    def walk(self):
+        '''
+        Returns list of keys of all items and their subitems
+        :return:
+        '''
+
+        out_items = []
+        for key, it in self.items():
+            out_items.append(it.name)
+            if isinstance(it, GroupH5):
+                out_items.extend(it.walk())
+
+        return out_items
+
 class InstrumentFileH5(ABC):
     """
     Abstract class describing generic H5-like files to be used as files containing data
@@ -459,6 +473,14 @@ class InstrumentFileH5(ABC):
                         self[item].write(h5out, **kwargs)
                     except ValueError:
                         pass
+
+    def walk(self):
+        '''
+        Returns list of items in the object
+        :return:
+        '''
+
+        return self._h5.walk()
 
 
 class SaxspointH5(InstrumentFileH5):
