@@ -19,6 +19,7 @@ origin = None
 }
 ''')
 
+
 def get_item_and_type(data):
     '''
     Extracts a value from single-item dataset, and type as string
@@ -36,7 +37,8 @@ def get_item_and_type(data):
 
     return value, val_type
 
-def dataset_to_scope(dataset, name = None, **kwargs):
+
+def dataset_to_scope(dataset, name=None, **kwargs):
     '''
     Converts DatasetH5 into PHIL scope
     :param dataset:
@@ -52,23 +54,26 @@ def dataset_to_scope(dataset, name = None, **kwargs):
         value, val_type = get_item_and_type(dataset)
 
     value_definition = phil.definition('value',
-                            ["{}".format(value)],
-                            type=val_type,
-                            help='Parameter value')
+                                       ["{}".format(value)],
+                                       type=val_type,
+                                       help='Parameter value')
     attrs_objects = []
-    for key,attr in dataset.attrs.items():
+    for key, attr in dataset.attrs.items():
         val, val_type = get_item_and_type(attr)
-        attrs_objects.append(phil.definition(key,[val], type=val_type))
+        attrs_objects.append(phil.definition(key, [val], type=val_type))
 
     attributes_scope = phil.scope('attrs',
-                                  objects = attrs_objects,
+                                  objects=attrs_objects,
                                   help='Parameter attributes')
 
     return phil.scope(name,
                       objects=[value_definition, attributes_scope],
                       **kwargs)
 
-def extract_geometry_to_phil(header, name='detector', parent='/entry/instrument/detector', skip=['time','x_pixel_offset','y_pixel_offset', 'pixel_mask', 'geometry']):
+
+def extract_geometry_to_phil(header, name='detector', parent='/entry/instrument/detector',
+                             skip=['time', 'x_pixel_offset', 'y_pixel_offset', 'pixel_mask',
+                                   'geometry']):
     '''
     Extract geometry information from the header to a PHIL scope
     :param header:
@@ -83,8 +88,8 @@ def extract_geometry_to_phil(header, name='detector', parent='/entry/instrument/
     for key, val in detector.items():
         if key in skip:
             continue
-        if  isinstance(val, h5z.DatasetH5):
-            objects.append(dataset_to_scope(val,key))
+        if isinstance(val, h5z.DatasetH5):
+            objects.append(dataset_to_scope(val, key))
 
     return phil.scope(name,
                       objects)
@@ -97,7 +102,7 @@ def rotate_by_axis_matrix(axis, angle):
     :param angle: rotation angle
     :return: rotation matrix (numpy.array 3x3)
     '''
-    size_axis = math.sqrt(axis[0]*axis[0] + axis[1]*axis[1] + axis[2]*axis[2])
+    size_axis = math.sqrt(axis[0] * axis[0] + axis[1] * axis[1] + axis[2] * axis[2])
     ux = axis[0] / size_axis
     uy = axis[1] / size_axis
     uz = axis[2] / size_axis
@@ -105,9 +110,11 @@ def rotate_by_axis_matrix(axis, angle):
     cT = math.cos(angle)
     sT = math.sin(angle)
 
-    return numpy.array([[cT + ux*ux*(1 - cT)   , ux*uy*(1 - cT)- uz*sT , ux*uz*(1 - cT) + uy*sT],
-                        [uy*ux*(1 - cT) + uz*sT, cT + uy * uy *(1 - cT), uy*uz*(1 - cT) - ux*sT],
-                        [uz*uz*(1 - cT) - uy*sT, uz*uy*(1 - cT) + ux*sT, cT + uz*uz*(1 - cT)   ]])
+    return numpy.array(
+        [[cT + ux * ux * (1 - cT), ux * uy * (1 - cT) - uz * sT, ux * uz * (1 - cT) + uy * sT],
+         [uy * ux * (1 - cT) + uz * sT, cT + uy * uy * (1 - cT), uy * uz * (1 - cT) - ux * sT],
+         [uz * uz * (1 - cT) - uy * sT, uz * uy * (1 - cT) + ux * sT, cT + uz * uz * (1 - cT)]])
+
 
 def translate_by_vector(vector, distance):
     '''
@@ -116,12 +123,13 @@ def translate_by_vector(vector, distance):
     :param distance: distance of the translation
     :return:
     '''
-    size_vec = math.sqrt(vector[0]*vector[0] + vector[1]*vector[1] + vector[2]*vector[2])
+    size_vec = math.sqrt(vector[0] * vector[0] + vector[1] * vector[1] + vector[2] * vector[2])
     ux = vector[0] / size_vec
     uy = vector[1] / size_vec
     uz = vector[2] / size_vec
 
     return distance * numpy.array([ux, uy, uz])
+
 
 def vector_from_string(vecin):
     '''
@@ -133,15 +141,20 @@ def vector_from_string(vecin):
     ls = vecin.split(',')
     return numpy.array(ls, dtype=float)
 
+
 def rotation_factory(rotation_matrix):
     def operator(x):
         return rotation_matrix @ x
+
     return operator
+
 
 def translation_factory(translation_vector):
     def operator(x):
         return x + translation_vector
+
     return operator
+
 
 def detector_real_space(header):
     '''
@@ -152,33 +165,35 @@ def detector_real_space(header):
 
     x0 = header['entry/instrument/detector/x_pixel_offset'][:]
     y0 = header['entry/instrument/detector/y_pixel_offset'][:]
-    #x0 = numpy.array([1,2,3])
-    #y0 = numpy.array([6,7,8,9])
+    # x0 = numpy.array([1,2,3])
+    # y0 = numpy.array([6,7,8,9])
     zero = numpy.array([0])
 
-    X0, Y0 = numpy.meshgrid(y0,x0)
-   # Z0 = numpy.zeros(X0.shape)
+    X0, Y0 = numpy.meshgrid(y0, x0)
+    # Z0 = numpy.zeros(X0.shape)
 
-    XYZ = numpy.array(numpy.meshgrid(x0,y0,zero)).T.reshape(-1,3)
+    XYZ = numpy.array(numpy.meshgrid(x0, y0, zero)).T.reshape(-1, 3)
 
     detector = 'entry/instrument/detector'
     transformation = header[detector]
     transformation.attrs['depends_on'] = transformation['depends_on'].item()
 
     while 'depends_on' in transformation.attrs:
-        transformation = header[detector+'/' + transformation.attrs['depends_on'].decode()]
+        transformation = header[detector + '/' + transformation.attrs['depends_on'].decode()]
         if transformation.attrs['transformation'].decode() == 'translation':
             u_vec = vector_from_string(transformation.attrs['vector'].decode())
             translation_vector = translate_by_vector(u_vec, transformation.item())
             XYZ = XYZ + translation_vector
         elif transformation.attrs['transformation'].decode() == 'rotation':
             u_vec = vector_from_string(transformation.attrs['vector'].decode())
-            rotation_matrix_T = rotate_by_axis_matrix(transformation.attrs['vector'],transformation.item()).T
+            rotation_matrix_T = rotate_by_axis_matrix(transformation.attrs['vector'],
+                                                      transformation.item()).T
             XYZ = XYZ @ rotation_matrix_T
         else:
             raise KeyError('Wrong transformation type:' + transformation['transformation'])
 
     return XYZ
+
 
 def get_q_axis(bins):
     '''
@@ -186,11 +201,11 @@ def get_q_axis(bins):
     :param bins:
     :return: np.array
     '''
-    l = [(b[1]-b[0])/2+b[0] for b in bins]
+    l = [(b[1] - b[0]) / 2 + b[0] for b in bins]
     return numpy.array(l)
 
 
-def get_q(XYZ, beam_vec, wavelength = 1):
+def get_q(XYZ, beam_vec, wavelength=1):
     '''
     Calculates radial q-values for the pixels
     :param XYZ: array of vectors ( dimensions 3,N)
@@ -198,13 +213,17 @@ def get_q(XYZ, beam_vec, wavelength = 1):
     :param wavelength: X-ray wavelength. Units define output units.
     :return: numpy.array of q-values, 1D
     '''
-    beam_norm = math.sqrt(beam_vec[0]*beam_vec[0]+beam_vec[1]*beam_vec[1]+beam_vec[2]*beam_vec[2]) * beam_vec
+    beam_norm = math.sqrt(
+        beam_vec[0] * beam_vec[0] + beam_vec[1] * beam_vec[1] + beam_vec[2] * beam_vec[
+            2]) * beam_vec
     XYZT = XYZ.T
-    cos2T = (beam_norm @ XYZT) / numpy.sqrt(XYZT[0]*XYZT[0]+XYZT[1]*XYZT[1]+XYZT[2]*XYZT[2])
-    sinT = numpy.sqrt((1-cos2T)/2)
-    return 4*math.pi*sinT/wavelength
+    cos2T = (beam_norm @ XYZT) / numpy.sqrt(
+        XYZT[0] * XYZT[0] + XYZT[1] * XYZT[1] + XYZT[2] * XYZT[2])
+    sinT = numpy.sqrt((1 - cos2T) / 2)
+    return 4 * math.pi * sinT / wavelength
 
-def transform_detector_radial_q(header, beam = (0,0,1), unit='nm'):
+
+def transform_detector_radial_q(header, beam=(0, 0, 1), unit='nm'):
     '''
     Perform q-transformation of the detector based on the header.
     Length of q-vector is returned for each pixel in an array corresponding to the frame.
@@ -220,19 +239,20 @@ def transform_detector_radial_q(header, beam = (0,0,1), unit='nm'):
     else:
         raise AttributeError('Unknown unit: {}'.format(unit))
 
-    if not ((wl_unit := header['entry/instrument/monochromator/wavelength'].attrs['units'].decode()) == 'm'):
-        raise IOError('Unknown wavelength unit on input: {}'.format(wl_unit)) # TODO: Change to user error, when logging and stuff in place
-
+    if not ((wl_unit := header['entry/instrument/monochromator/wavelength'].attrs[
+        'units'].decode()) == 'm'):
+        raise aares.RuntimeErrorUser('Unknown wavelength unit on input: {}'.format(
+            wl_unit))
 
     if beam is not numpy.ndarray:
         beam = numpy.array(beam)
 
     XYZ = detector_real_space(header)
 
-    Q = get_q(XYZ, beam, header.wavelength/unit_multiplier)
+    Q = get_q(XYZ, beam, header.wavelength / unit_multiplier)
     x0 = header['entry/instrument/detector/x_pixel_offset'][:]
     y0 = header['entry/instrument/detector/y_pixel_offset'][:]
-    arrQ = Q.reshape([len(x0),len(y0)], order='C').T
+    arrQ = Q.reshape([len(x0), len(y0)], order='C').T
 
     return arrQ
 
@@ -252,7 +272,7 @@ class ArrayQ(h5z.InstrumentFileH5):
         :type source: NoneType, or h5z.SaxspointH5, or path to h5z-file, or path to aares H5 file
         '''
 
-        assert isinstance(source,h5z.SaxspointH5) or \
+        assert isinstance(source, h5z.SaxspointH5) or \
                isinstance(source, str) or \
                source is None
 
@@ -272,7 +292,6 @@ class ArrayQ(h5z.InstrumentFileH5):
             self.attrs['aares_version'] = str(aares.version)
             self.attrs['aares_detector_class'] = 'SaxspointH5'
             self.read_geometry(source)
-
 
     def read_geometry(self, source):
         '''
@@ -324,7 +343,27 @@ class ArrayQ(h5z.InstrumentFileH5):
     def geometry_fields(self, val):
         self._geometry_fields = val
 
-    def is_type(self,val):
+    @property
+    def q_length(self):
+        '''
+        Returns an array of q-vector lenghts for individual pixels
+        :return:
+        '''
+        try:
+            arrQ = self['/processing/q_vector/length'][:]
+        except KeyError:
+            raise AttributeError('Q-vectors were not set yet.')
+
+        return arrQ
+
+    @q_length.setter
+    def q_length(self, val):
+        out_q = h5z.DatasetH5(val, name='/processing/q_vector/length')
+        out_q.attrs['units'] = 'nm^-1'
+        out_q.attrs['long_name'] = 'Length of the q-vector corresponding to given pixel'
+        self['/processing/q_vector/length'] = out_q
+
+    def is_type(self, val):
         '''
         Check if the file is of the correct type.
         :param val:
@@ -340,17 +379,17 @@ class ArrayQ(h5z.InstrumentFileH5):
                 #     out.append(True)
                 # else:
                 #     out.append(False)
-#        elif isinstance(val, h5z.GroupH5) or isinstance(val,h5py.Group):
-#            attributes.update(val.attrs)
+        #        elif isinstance(val, h5z.GroupH5) or isinstance(val,h5py.Group):
+        #            attributes.update(val.attrs)
         else:
             raise TypeError('Input should be h5a file.')
 
         try:
             out.extend(['aares_detector_class' in attributes,
-                    attributes['aares_file_type'] == 'q_space'])
+                        attributes['aares_file_type'] == 'q_space'])
 
             if not attributes['aares_version'] == str(aares.version):
-                    logging.warning('AAres version used and of the file does not match.')
+                logging.warning('AAres version used and of the file does not match.')
         except KeyError:
             out.append(False)
 
@@ -358,34 +397,35 @@ class ArrayQ(h5z.InstrumentFileH5):
 
 
 def test(fin):
-
     import time
     import matplotlib.pyplot as plt
 
     h5in = h5z.SaxspointH5(fin)
 
- #   h5in.write('test_out.h5', skipped=True)
+    #   h5in.write('test_out.h5', skipped=True)
 
     cArrQ = ArrayQ(fin)
 
-    cArrQ.write_to_file('q-r.h5')
+    #   print(all(h5in[match] == cArrQ[match] for match in h5in.geometry_fields))
 
-    cArrQ2 = ArrayQ('q-r.h5')
-    print(all(h5in[match] == cArrQ[match] for match in h5in.geometry_fields))
-
-    a = numpy.array([[1,2,3],
-                     [4,5,6],
-                     [7,8,9],
-                     [1,2,3]])
-
-    aq = get_q(a, numpy.array([1,0,0]))
+    # a = numpy.array([[1,2,3],
+    #                  [4,5,6],
+    #                  [7,8,9],
+    #                  [1,2,3]])
+    #
+    # aq = get_q(a, numpy.array([1,0,0]))
 
     t0 = time.time()
-    arrQ = transform_detector_radial_q(h5in, (0,0,1))
+    arrQ = transform_detector_radial_q(h5in, (0, 0, 1))
     dt1 = time.time() - t0
 
     print(dt1)
 
+    cArrQ.q_length = arrQ
+
+    cArrQ.write_to_file('q-r.h5')
+
+    cArrQ2 = ArrayQ('q-r.h5')
 
     qmin = numpy.amin(arrQ)
     qmax = numpy.max(arrQ)
@@ -399,23 +439,22 @@ def test(fin):
     with h5z.FileH5Z(fin) as h5f:
         fr = h5f['entry/data/data'][0]
 
-    #plt.imshow(fr)
+    # plt.imshow(fr)
     plt.imshow(arrQ)
     plt.show()
     det_pos = numpy.array([0.1, .2, 0])
 
-
-#    t1 =time.time()
-#    trans_list = get_detector_transformation_list(h5in)
-#    det_trans = get_composition_operator(trans_list)
-#    pixel_XYZ = transform_detector(h5in,det_trans)
-#    dt2 = time.time() - t1
-#    print(dt1,dt2)
+    #    t1 =time.time()
+    #    trans_list = get_detector_transformation_list(h5in)
+    #    det_trans = get_composition_operator(trans_list)
+    #    pixel_XYZ = transform_detector(h5in,det_trans)
+    #    dt2 = time.time() - t1
+    #    print(dt1,dt2)
     pass
+
 
 def main():
     test('../data/AgBeh_826mm.h5z')
-
 
 
 if __name__ == '__main__':
