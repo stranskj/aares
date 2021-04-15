@@ -184,7 +184,14 @@ class DatasetH5(np.ndarray):
     def __new__(self, source_dataset=None, name=None, *args, **kwargs):
 
         if source_dataset is not None:
-            obj = super().__new__(self, source_dataset.shape, source_dataset.dtype, buffer=source_dataset[()])
+            if isinstance(source_dataset,np.ndarray):
+                if np.isfortran(source_dataset):
+                    order = 'F'
+                else:
+                    order = 'C'
+            else:
+                order = 'C'
+            obj = super().__new__(self, source_dataset.shape, source_dataset.dtype, buffer=source_dataset[()], order=order)
         else:
             obj = super().__new__(self, *args, **kwargs)
         obj.attrs = {}
