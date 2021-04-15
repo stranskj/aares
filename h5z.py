@@ -333,7 +333,7 @@ class GroupH5(dict):
             dict.__setitem__(self, split_key[0],value)
         else:
             if split_key[0] not in self:
-                dict.__setitem__(self, split_key[0], GroupH5())
+                dict.__setitem__(self, split_key[0], GroupH5(name=self.name+'/'+split_key[0]))
             if not isinstance(self[split_key[0]], GroupH5):
                 raise KeyError('The existing key cannot be extended, because it is not GroupH5 object. "{}"'.format(key))
 
