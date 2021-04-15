@@ -254,7 +254,7 @@ def transform_detector_radial_q(header, beam=(0, 0, 1), unit='nm'):
     y0 = header['entry/instrument/detector/y_pixel_offset'][:]
     arrQ = Q.reshape([len(x0), len(y0)], order='C').T
 
-    return arrQ
+    return numpy.ascontiguousarray(arrQ)
 
 
 class ArrayQ(h5z.InstrumentFileH5):
@@ -404,7 +404,7 @@ def test(fin):
 
     #   h5in.write('test_out.h5', skipped=True)
 
-    cArrQ = ArrayQ(fin)
+    cArrQ = ArrayQ(h5in)
 
     #   print(all(h5in[match] == cArrQ[match] for match in h5in.geometry_fields))
 
@@ -427,20 +427,22 @@ def test(fin):
 
     cArrQ2 = ArrayQ('q-r.h5')
 
+    lng = cArrQ.q_length
+
     qmin = numpy.amin(arrQ)
     qmax = numpy.max(arrQ)
-    idx_qmin = numpy.where(arrQ == qmin)
+    idx_qmin = numpy.where(lng == qmin)
 
     print(qmin, qmax)
 
     print(arrQ[245, 526])
-    print(arrQ[245, 513])
+    print(arrQ[526,246])
 
     with h5z.FileH5Z(fin) as h5f:
         fr = h5f['entry/data/data'][0]
 
     # plt.imshow(fr)
-    plt.imshow(arrQ)
+    plt.imshow(lng)
     plt.show()
     det_pos = numpy.array([0.1, .2, 0])
 
