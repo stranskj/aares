@@ -32,9 +32,13 @@ group
     .help = File with geometry description. Special PHIL file, or H5 with correct header
     .expert_level = 3
 
+    q_space = None
+    .type = path
+    .help = File with detector transformed to Q space.
+
     mask = None
     .type = path
-    .help = File with the mask to be used.
+    .help = File with the mask to be used. File of the same form as from aares.mask
     .expert_level = 0
 
     file 
@@ -545,7 +549,6 @@ class DataFilesCarrier:
         :return:
         '''
         import h5py
-
 
         if file_in is None:
             file_in = self.header_file

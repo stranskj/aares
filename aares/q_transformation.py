@@ -4,10 +4,14 @@ import math
 import copy
 import aares.power as pwr
 import aares
+import aares.datafiles
 import logging
 import freephil as phil
+import os
 
-phil_core = phil.parse('''
+program_short_description = 'Transforms file Q-space coordinates'
+
+phil_core_str = '''
 q_transformation {
 units = *nm A
 .type = choice
@@ -15,10 +19,25 @@ units = *nm A
 
 origin = None
 .type = ints(2)
-.help = Beam position at the detector in pixels
+.help = Beam position at the detector in pixels (Not implemented yet)
 }
-''')
+'''
 
+phil_core = phil.parse(phil_core_str)
+
+phil_prog = phil.parse('''
+include scope aares.common.phil_input_files
+
+input = None
+.type = path
+.help = Input file to be processed. Single H5-like file is allowed, for multiple files, use AAres importing protocol
+
+output = None
+.type = path
+.help = Output file. Used only with single file input.
+
+    '''+phil_core_str, process_includes=True
+)
 
 def get_item_and_type(data):
     '''
@@ -257,10 +276,12 @@ def transform_detector_radial_q(header, beam=(0, 0, 1), unit='nm'):
     return numpy.ascontiguousarray(arrQ)
 
 
-class ArrayQ(h5z.InstrumentFileH5):
+class ArrayQ(h5z.SaxspointH5):
     '''
     Detector surface transformed to Q-values
     '''
+
+    #TODO: transform to Class factory
 
     skip_entries = []
 
@@ -330,6 +351,13 @@ class ArrayQ(h5z.InstrumentFileH5):
 
         self.write(fout, mode=mode, compression='gzip')
 
+    def calculate_q(self,beam = (0,0,1), unit='nm'):
+        '''
+        Performs the Q-transformation
+        :return:
+        '''
+        self.q_length = transform_detector_radial_q(self, beam=beam, unit=unit)
+
     @property
     def geometry_fields(self):
         try:
@@ -395,6 +423,74 @@ class ArrayQ(h5z.InstrumentFileH5):
 
         return all(out)
 
+class JobQtrasform(aares.Job):
+
+
+    def __set_meta__(self):
+        super().__set_meta__()
+        self._program_short_description = program_short_description
+
+
+
+    def __set_system_phil__(self):
+        self.system_phil = phil_prog
+
+    def __help_epilog__(self):
+        pass
+
+    def __argument_processing__(self):
+        pass
+
+    def __process_unhandled__(self):
+        if len(self.unhandled) > 0: # First file is input file
+            if h5z.is_h5_file(self.unhandled[0]):
+                self.params.input = self.unhandled[0]
+            elif aares.datafiles.is_fls(self.unhandled[0]):
+                self.params.input_files = self.unhandled[0]
+            else:
+                raise aares.RuntimeErrorUser('Unknown input: {}'.format(self.unhandled))
+
+        if len(self.unhandled) == 2:  # Second file is output file
+            root, ext = os.path.splitext(self.unhandled[1])
+            if not 'h5a' in ext:
+                raise aares.RuntimeErrorUser('This should be output file in h5a-format: {}'.format(self.unhandled[1]))
+            self.params.output = self.unhandled[1]
+        elif len(self.unhandled) >2:
+            raise aares.RuntimeErrorUser('Too many input parameters.')
+        else:
+            pass
+
+    def __worker__(self):
+
+        if  (((self.params.input is not None) and (self.params.input_files is not None)) or
+            ((self.params.input is None) and (self.params.input_files is None))):
+            raise aares.RuntimeErrorUser('Exactly one of the parameters has to be set:\n\tinput\n\tinput_files')
+
+        if (self.params.input_files is not None) and (self.params.output is not None):
+            logging.warning('Output keyword is ignored, definitions from {} are used instead.'.format(self.params.input_files))
+
+        to_process = []
+        if self.params.input_files is not None:
+            imported_files = aares.datafiles.DataFilesCarrier(file_phil=self.params.input_files)
+            for group in imported_files.file_groups:
+                if group.q_space is None:
+                    group.q_space = group.name + '.q_space.h5a'
+
+                to_process.append((group.q_space, ArrayQ(imported_files.files_dict[group.geometry])))
+        elif self.params.input is not None:
+            if self.params.output is None:
+                self.params.output = self.params.input + '.q_space.h5a'
+            aares.my_print('Reading file header...')
+            to_process.append((self.params.output, ArrayQ(self.params.input)))
+        else:
+            raise AssertionError
+
+        aares.my_print('Performing Q-transformation')
+        for fout, arrQ in to_process:
+            arrQ.calculate_q()
+            aares.my_print('Writing: {}'.format(fout))
+            arrQ.write_to_file(fout)
+
 
 def test(fin):
     import time
@@ -456,8 +552,10 @@ def test(fin):
 
 
 def main():
-    test('../data/AgBeh_826mm.h5z')
+  #  test('../data/AgBeh_826mm.h5z')
 
+    job = JobQtrasform()
+    return job.job_exit
 
 if __name__ == '__main__':
     main()
