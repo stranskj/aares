@@ -247,15 +247,23 @@ class FileGroup():
         assert isinstance(main_phil, phil.scope)
         self._main_phil = main_phil
         work_scope = group_phil.fetch(group_phil.format(scope_in))
-        self.__scope_extract = work_scope.extract()
         self.__group_phil = None
 
+        setattr(self, '_scope_extract', work_scope.extract()) # Has to be the last one
 
     def __getattr__(self, item):
-        if item not in dir(self.__class__):
-            return self.__scope_extract.__getattribute__(item)
+        if item not in dir(self):
+            return getattr(self._scope_extract,item)
         else:
             return getattr(self, item)
+
+    def __setattr__(self, key, value):
+
+        if (key in dir(self)) or ('_scope_extract' not in dir(self)):
+            self.__dict__[key] = value
+        else:
+            setattr(self._scope_extract,key,value)
+
 
     @property
     def group_phil(self):
@@ -279,6 +287,17 @@ class FileGroup():
     def group_phil(self,val):
         self.__group_phil = val
 
+    @property
+    def geometry(self):
+        geom = self._scope_extract.geometry
+        if geom is None:
+            geom = self.scope_extract.file[0].path
+        return geom
+
+    @geometry.setter
+    def geometry(self, val):
+        self.scope_extract.geometry = val
+
     def write(self):
         '''
         Writes current work phil configuration to file
@@ -298,11 +317,11 @@ class FileGroup():
 
     @property
     def scope_extract(self):
-        return self.__scope_extract
+        return self._scope_extract
 
     @scope_extract.setter
     def scope_extract(self, val):
-        self.__scope_extract = val
+        self._scope_extract = val
 
 class DataFilesCarrier:
     """
@@ -458,6 +477,8 @@ class DataFilesCarrier:
                 self.write_headers_to_file()
         else:
             self.read_headers()
+
+
 
 
     def _is_file_key(self, key):

@@ -20,6 +20,10 @@ units = *nm A
 origin = None
 .type = ints(2)
 .help = Beam position at the detector in pixels (Not implemented yet)
+
+file = None
+.type = path
+.help = File storing q-space coordinates. Aares H5 file.
 }
 '''
 
@@ -471,7 +475,7 @@ class JobQtrasform(aares.Job):
 
         to_process = []
         if self.params.input_files is not None:
-            imported_files = aares.datafiles.DataFilesCarrier(file_phil=self.params.input_files)
+            imported_files = aares.datafiles.DataFilesCarrier(file_phil=self.params.input_files, mainphil=phil_core)
             for group in imported_files.file_groups:
                 if group.q_space is None:
                     group.q_space = group.name + '.q_space.h5a'
