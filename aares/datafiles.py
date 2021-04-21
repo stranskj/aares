@@ -11,17 +11,7 @@ import aares
 import h5z
 from aares import power as pwr
 
-
-phil_files = phil.parse('''
-headers = None
-.type = path
-.help = File storing parsed headers. If the file is not present, headers are read from the original data files.
-
-group 
-.multiple = True
-.help = Group of files with the same geometry header
-.expert_level = 0
-{
+group_phil_str = '''
     name = None
     .expert_level = 0
     .help = Name of the group
@@ -35,6 +25,11 @@ group
     q_space = None
     .type = path
     .help = File with detector transformed to Q space.
+    
+    phil = None
+    .type = path
+    .multiple = True
+    .help = Processing configuration for this group. Phil file is accepted.
 
     mask = None
     .type = path
@@ -53,6 +48,19 @@ group
         .type = str
         .help = String which is used as a reference for the file elsewhere. It has to be unique string.
     }
+'''
+group_phil = phil.parse(group_phil_str)
+phil_files = phil.parse('''
+headers = None
+.type = path
+.help = File storing parsed headers. If the file is not present, headers are read from the original data files.
+
+group 
+.multiple = True
+.help = Group of files with the same geometry header
+.expert_level = 0
+{
+    ''' + group_phil_str + '''   
 
 }
 ''')
@@ -227,6 +235,74 @@ class FileHeadersDictionary(dict):
                 raise KeyError('Entry does not exist: {}'.format(key))
         return item
 
+class FileGroup():
+    """
+    Holds information on group of files with common geometry
+
+    :var __group_phil: Phil scope_extract with processing parameters for the group
+    :var __scope_extract: group entry in FLS file
+    """
+    def __init__(self, main_phil, scope_in = None ):
+        assert isinstance(scope_in, phil.scope_extract) or scope_in is None
+        assert isinstance(main_phil, phil.scope)
+        self._main_phil = main_phil
+        work_scope = group_phil.fetch(group_phil.format(scope_in))
+        self.__scope_extract = work_scope.extract()
+        self.__group_phil = None
+
+
+    def __getattr__(self, item):
+        if item not in dir(self.__class__):
+            return self.__scope_extract.__getattribute__(item)
+        else:
+            return getattr(self, item)
+
+    @property
+    def group_phil(self):
+        '''
+        Scope extract of the configuration for the group
+        :return:
+        '''
+        if self.__group_phil is None:
+            self.__group_phil = self._main_phil.extract()
+            if self.phil is not None:
+                for fi in self.phil:
+                    try:
+                        with open(fi,'r') as fin:
+                            self.__group_phil = self._main_phil.fetch(fin).extract()
+                    except OSError:
+                        logging.warning('File does not exist, skipping: {}'.format(fi))
+
+        return self.__group_phil
+
+    @group_phil.setter
+    def group_phil(self,val):
+        self.__group_phil = val
+
+    def write(self):
+        '''
+        Writes current work phil configuration to file
+        :return:
+        '''
+        work_scope = self._main_phil.format(self.group_phil)
+        i = 0
+        while (os.path.isfile(file_name := self.name+'_work'+str(i)+'.phil')):
+            i += 1
+        self.phil = [file_name] + self.phil
+
+        try:
+            with open(file_name, 'w') as fout:
+                fout.write(work_scope.as_str())
+        except PermissionError:
+            raise aares.RuntimeErrorUser('Cannot write to file: {}'.format(file_name))
+
+    @property
+    def scope_extract(self):
+        return self.__scope_extract
+
+    @scope_extract.setter
+    def scope_extract(self, val):
+        self.__scope_extract = val
 
 class DataFilesCarrier:
     """
@@ -239,7 +315,7 @@ class DataFilesCarrier:
 
     _master_group_name = '/file_headers'
 
-    def __init__(self, run_phil=None, file_phil=None, nproc=None):
+    def __init__(self, run_phil=None, file_phil=None, nproc=None, mainphil=None):
         """
         :param run_phil:
         :type  run_phil: phil.scope_extract
@@ -248,10 +324,13 @@ class DataFilesCarrier:
         """
 
         assert (run_phil is not None) ^ (file_phil is not None)
+        assert isinstance(mainphil, phil.scope)
 
+        self.main_phil = mainphil
         self._files_dict = FileHeadersDictionary()
         self.file_scope = phil_files.extract()
-        self.file_groups = None
+        self.__file_groups = None
+        #self.file_groups = None
         self.nproc = nproc
 
         if run_phil is not None:
@@ -266,6 +345,15 @@ class DataFilesCarrier:
         return len(self.files_dict)
 
     @property
+    def file_scope(self):
+        return self.__file_scope
+
+    @file_scope.setter
+    def file_scope(self, val):
+        self.__file_scope = val
+        self.file_groups = val.group
+
+    @property
     def files_dict(self):
         return self._files_dict
 
@@ -276,10 +364,15 @@ class DataFilesCarrier:
 
     @property
     def file_groups(self):
-        return self.file_scope.group
+      #  return self.file_scope.group
+        return self.__file_groups
 
     @file_groups.setter
     def file_groups(self, item):
+        self.__file_groups = []
+        for val in item:
+            self.__file_groups.append(FileGroup(self.main_phil, val))
+
         self.file_scope.group = item
 
     @property
@@ -318,7 +411,7 @@ class DataFilesCarrier:
         groups = files_to_groups(self.files_dict, headers_to_match= h5z.SaxspointH5.geometry_fields ,ignore_merged=phil_in.ignore_merged)
         aares.my_print(
             'Files assigned to {} group(s) by common experiment geometry.'.format(len(groups)))
-        self.file_groups = phil_files.extract()
+  #      self.file_groups = phil_files.extract()
         self.file_groups = groups
 
         if phil_in.headers is None:
@@ -356,6 +449,7 @@ class DataFilesCarrier:
         assert isinstance(phil_in, phil.scope_extract)
 
         self.file_scope = phil_files.format(phil_in).extract()
+ #       self.file_groups = self.file_scope.group
         if self.header_file is not None:
             if os.path.isfile(self.header_file):
                 self.read_headers_from_file()
@@ -534,7 +628,6 @@ class DataFilesCarrier:
 
         master_group.attrs['aares_file_type'] = 'data_file_headers'
         master_group.attrs['aares_version'] = str(aares.version)
-    # TODO: verze se nevraci jako string
 
         try:
             with h5py.File(file_out, 'w') as fiout:

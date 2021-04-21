@@ -102,14 +102,14 @@ class JobImport(aares.Job):
             file_scope = aares.datafiles.phil_files.fetch(sources=file_phils)
 
             aares.my_print('\nReading headers of data files...')
-            run = aares.datafiles.DataFilesCarrier(file_phil=file_scope)
+            run = aares.datafiles.DataFilesCarrier(file_phil=file_scope, mainphil=self.system_phil)
 
             run.read_headers() #Might be done for second time, is HDR-file originally exist...
             if self.params.to_import.headers is None:
                  self.params.to_import.headers = os.path.splitext(self.params.to_import.output)[0]+'.hdr'
             run.header_file = self.params.to_import.headers
         else:
-            run = aares.datafiles.DataFilesCarrier(run_phil=self.params.to_import)
+            run = aares.datafiles.DataFilesCarrier(run_phil=self.params.to_import, mainphil=self.system_phil)
 
         files = aares.datafiles.phil_files.format(run.file_groups)
         #       print(files.as_str(expert_level=0))
