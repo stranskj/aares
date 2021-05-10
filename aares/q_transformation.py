@@ -40,8 +40,9 @@ output = None
 .type = path
 .help = Output file. Used only with single file input.
 
-    '''+phil_core_str, process_includes=True
-)
+    ''' + phil_core_str, process_includes=True
+                       )
+
 
 def get_item_and_type(data):
     '''
@@ -285,7 +286,7 @@ class ArrayQ(h5z.SaxspointH5):
     Detector surface transformed to Q-values
     '''
 
-    #TODO: transform to Class factory
+    # TODO: transform to Class factory
 
     skip_entries = []
 
@@ -302,7 +303,7 @@ class ArrayQ(h5z.SaxspointH5):
                source is None
 
         self._h5 = h5z.GroupH5(name='/')
-        self.geometry_fields = []
+        self.geometry_fields = [] #TODO: should not be here? inherited from the class...
         self.attrs['aares_version'] = str(aares.version)
         self.attrs['aares_file_type'] = 'q_space'
 
@@ -355,7 +356,7 @@ class ArrayQ(h5z.SaxspointH5):
 
         self.write(fout, mode=mode, compression='gzip')
 
-    def calculate_q(self,beam = (0,0,1), unit='nm'):
+    def calculate_q(self, beam=(0, 0, 1), unit='nm'):
         '''
         Performs the Q-transformation
         :return:
@@ -427,14 +428,12 @@ class ArrayQ(h5z.SaxspointH5):
 
         return all(out)
 
-class JobQtrasform(aares.Job):
 
+class JobQtrasform(aares.Job):
 
     def __set_meta__(self):
         super().__set_meta__()
         self._program_short_description = program_short_description
-
-
 
     def __set_system_phil__(self):
         self.system_phil = phil_prog
@@ -446,7 +445,7 @@ class JobQtrasform(aares.Job):
         pass
 
     def __process_unhandled__(self):
-        if len(self.unhandled) > 0: # First file is input file
+        if len(self.unhandled) > 0:  # First file is input file
             if h5z.is_h5_file(self.unhandled[0]):
                 self.params.input = self.unhandled[0]
             elif aares.datafiles.is_fls(self.unhandled[0]):
@@ -457,30 +456,36 @@ class JobQtrasform(aares.Job):
         if len(self.unhandled) == 2:  # Second file is output file
             root, ext = os.path.splitext(self.unhandled[1])
             if not 'h5a' in ext:
-                raise aares.RuntimeErrorUser('This should be output file in h5a-format: {}'.format(self.unhandled[1]))
+                raise aares.RuntimeErrorUser(
+                    'This should be output file in h5a-format: {}'.format(self.unhandled[1]))
             self.params.output = self.unhandled[1]
-        elif len(self.unhandled) >2:
+        elif len(self.unhandled) > 2:
             raise aares.RuntimeErrorUser('Too many input parameters.')
         else:
             pass
 
     def __worker__(self):
 
-        if  (((self.params.input is not None) and (self.params.input_files is not None)) or
-            ((self.params.input is None) and (self.params.input_files is None))):
-            raise aares.RuntimeErrorUser('Exactly one of the parameters has to be set:\n\tinput\n\tinput_files')
+        if (((self.params.input is not None) and (self.params.input_files is not None)) or
+                ((self.params.input is None) and (self.params.input_files is None))):
+            raise aares.RuntimeErrorUser(
+                'Exactly one of the parameters has to be set:\n\tinput\n\tinput_files')
 
         if (self.params.input_files is not None) and (self.params.output is not None):
-            logging.warning('Output keyword is ignored, definitions from {} are used instead.'.format(self.params.input_files))
+            logging.warning(
+                'Output keyword is ignored, definitions from {} are used instead.'.format(
+                    self.params.input_files))
 
         to_process = []
         if self.params.input_files is not None:
-            imported_files = aares.datafiles.DataFilesCarrier(file_phil=self.params.input_files, mainphil=phil_core)
+            imported_files = aares.datafiles.DataFilesCarrier(file_phil=self.params.input_files,
+                                                              mainphil=phil_core)
             for group in imported_files.file_groups:
                 if group.q_space is None:
                     group.q_space = group.name + '.q_space.h5a'
 
-                to_process.append((group.q_space, ArrayQ(imported_files.files_dict[group.geometry])))
+                to_process.append(
+                    (group.q_space, ArrayQ(imported_files.files_dict[group.geometry])))
         elif self.params.input is not None:
             if self.params.output is None:
                 self.params.output = self.params.input + '.q_space.h5a'
@@ -536,7 +541,7 @@ def test(fin):
     print(qmin, qmax)
 
     print(arrQ[245, 526])
-    print(arrQ[526,246])
+    print(arrQ[526, 246])
 
     with h5z.FileH5Z(fin) as h5f:
         fr = h5f['entry/data/data'][0]
@@ -556,10 +561,11 @@ def test(fin):
 
 
 def main():
-  #  test('../data/AgBeh_826mm.h5z')
+    #  test('../data/AgBeh_826mm.h5z')
 
     job = JobQtrasform()
     return job.job_exit
+
 
 if __name__ == '__main__':
     main()

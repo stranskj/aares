@@ -16,6 +16,7 @@ import h5z
 import h5py
 import numpy
 import math
+import aares
 import aares.power as pwr
 import concurrent.futures
 import os, logging
@@ -56,7 +57,7 @@ reduction
         scale = None
         .type = float
         .expert_level=1
-        .help = Value, to which all the frames are scaled. If None, value from the first frame is chosen in such a way, that the scale of that frame is 1. (not implemented yet
+        .help = Value, to which all the frames are scaled. If None, value from the first frame is chosen in such a way, that the scale of that frame is 1. (not implemented yet)
     }
 }     
 '''
@@ -266,6 +267,146 @@ def prepare_bins(arrQ, qmin=None, qmax=None, bins=None, frame_mask=None):
     q_masks = list_integration_masks(q_bins, arrQ, frame_mask)
     return qt.get_q_axis(q_bins), q_masks
 
+class ReductionBins(h5z.SaxspointH5):
+    '''
+    Integration bins class
+    '''
+    def __init__(self, source=None):
+        '''
+        If header is provided, the geometry is read; if path to file is provided, the header is read from the file and then treated as such, or the is read from the file.
+
+        :param source: From where the data should be acquiered/read?
+        :type source: NoneType, or h5z.SaxspointH5, or path to h5z-file, or path to aares H5 file
+        '''
+
+        assert isinstance(source, h5z.SaxspointH5) or \
+               isinstance(source, str) or \
+               source is None
+
+        self._h5 = h5z.GroupH5(name='/')
+        #self.geometry_fields = []
+        self.attrs['aares_version'] = str(aares.version)
+        self.attrs['aares_file_type'] = 'reduction_bins'
+
+        if isinstance(source, str):
+            if h5z.is_h5_file(source):
+                if self.is_type(source):
+                    self.read_from_file(source)
+                else:
+                    source = h5z.SaxspointH5(source)
+
+        if isinstance(source, h5z.SaxspointH5):
+            self.attrs['aares_version'] = str(aares.version)
+            self.attrs['aares_detector_class'] = 'SaxspointH5'
+            #self.read_geometry(source)
+
+    def is_type(self, val):
+        '''
+        Check if the file is of the correct type.
+        :param val:
+        :return: bool
+        '''
+        import h5z, h5py
+        out = []
+        attributes = {}
+        if h5z.is_h5_file(val):
+            with h5z.FileH5Z(val, 'r') as fin:
+                attributes.update(fin.attrs)
+
+        else:
+            raise TypeError('Input should be h5a file.')
+
+        try:
+            out.extend(['aares_detector_class' in attributes,
+                        attributes['aares_file_type'] == 'reduction_bins'])
+
+            if not attributes['aares_version'] == str(aares.version):
+                logging.warning('AAres version used and of the file does not match: {}'.format(val))
+        except KeyError:
+            out.append(False)
+
+        return all(out)
+
+    def read_from_file(self, fin):
+        '''
+        Reads the data from a dedicated file
+        :param fin:
+        :return:
+        '''
+        self.read_header(fin)
+        #self.geometry_fields = self['entry'].walk()
+        if not self.attrs['aares_version'] == str(aares.version):
+            logging.warning('AAres version used and of the file does not match.')
+
+    def write_to_file(self, fout, mode='w'):
+        '''
+        Writes the array and geometry to the file.
+
+        :param fout:
+        :param mode:
+        :return:
+        '''
+
+        self.write(fout, mode=mode, compression='gzip')
+
+    def create_bins(self, arrQ, **kwargs):#qmin=None, qmax=None, bins=None, frame_mask=None):
+        '''
+        Performs binning. Calculates integration masks and stores the masks
+
+        :param arrQ: Q-transformed frame e.g. array, which holds q-value for each pixel
+        :type arrQ: np.array
+        :param qmin: q_min value
+        :type qmin: float
+        :param qmax: q_max value
+        :type qmax: float
+        :param bins: number of bins
+        :type bins: int
+        :param frame_mask: Additional mask for the frame.
+        :type frame_mask: np.array(bools)
+        :return: Returns array of q_values, and corresponding list of masks used for the integration
+        '''
+
+        self.q_axis, self.bin_masks = prepare_bins(arrQ, **kwargs)
+
+    @property
+    def bin_masks(self):
+        '''
+        Reduction bin masks
+        :return:
+        '''
+        try:
+            arrQ = self['/processing/reduction/bin_masks'][:]
+        except KeyError:
+            raise AttributeError('Bin maks were not calculated yet.')
+
+        return arrQ
+
+    @bin_masks.setter
+    def bin_masks(self,val):
+        data = h5z.DatasetH5(val, name='/processing/reduction/bin_masks')
+        data.attrs['units'] = 'bool'
+        data.attrs['long_name'] = 'Set of mask used for data reduction step.'
+        self['/processing/q_vector/length'] = data
+
+    @property
+    def q_axis(self):
+        '''
+        Naming of the bins on the q-axis
+        :return:
+        '''
+        try:
+            data = self['/processing/reduction/q_axis'][:]
+        except KeyError:
+            raise AttributeError('Q-vectors were not set yet.')
+
+        return data
+
+    @q_axis.setter
+    def q_axis(self,val):
+        dts = h5z.DatasetH5(val, name='/processing/reduction/q_axis')
+        dts.attrs['units'] = 'nm^-1'
+        dts.attrs['long_name'] = 'Description of q-axis.'
+        self['/processing/reduction/q_axis'] = dts
 
 def test():
     import aares.q_transformation as qt
@@ -299,7 +440,7 @@ def test():
 
     with open('data_826.dat', 'w') as fout:
         for q, I, s in zip(q_vals, avr, std):
-            fout.write('{} {} {}\n'.format(q, I, s))
+            fout.write('{},{},{}\n'.format(q, I, s))
 
     import aares.statistics as stats
     import aares.draw2d as draw2d
