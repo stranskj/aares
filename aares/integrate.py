@@ -18,6 +18,7 @@ import numpy
 import math
 import aares
 import aares.power as pwr
+
 import concurrent.futures
 import os, logging
 import freephil as phil
@@ -278,8 +279,9 @@ class ReductionBins(h5z.SaxspointH5):
         :param source: From where the data should be acquiered/read?
         :type source: NoneType, or h5z.SaxspointH5, or path to h5z-file, or path to aares H5 file
         '''
-
+        import aares.q_transformation as qt
         assert isinstance(source, h5z.SaxspointH5) or \
+               isinstance(source, qt.ArrayQ) or \
                isinstance(source, str) or \
                source is None
 
@@ -299,6 +301,9 @@ class ReductionBins(h5z.SaxspointH5):
             self.attrs['aares_version'] = str(aares.version)
             self.attrs['aares_detector_class'] = 'SaxspointH5'
             #self.read_geometry(source)
+        if isinstance(source,qt.ArrayQ):
+            self.attrs['aares_version'] = str(aares.version)
+            self.attrs['aares_detector_class'] = 'SaxspointH5'
 
     def is_type(self, val):
         '''
@@ -366,7 +371,9 @@ class ReductionBins(h5z.SaxspointH5):
         :return: Returns array of q_values, and corresponding list of masks used for the integration
         '''
 
-        self.q_axis, self.bin_masks = prepare_bins(arrQ, **kwargs)
+        qbins, bin_masks = prepare_bins(arrQ, **kwargs)
+        self.q_axis = numpy.array(qbins)
+        self.bin_masks = numpy.array(bin_masks)
 
     @property
     def bin_masks(self):
@@ -386,7 +393,7 @@ class ReductionBins(h5z.SaxspointH5):
         data = h5z.DatasetH5(val, name='/processing/reduction/bin_masks')
         data.attrs['units'] = 'bool'
         data.attrs['long_name'] = 'Set of mask used for data reduction step.'
-        self['/processing/q_vector/length'] = data
+        self['/processing/reduction/bin_masks'] = data
 
     @property
     def q_axis(self):
@@ -433,9 +440,15 @@ def test():
     q_masks = list_integration_masks(q_bins, arrQ, frame_mask=frame_mask)
     print(time.time() - t0)
 
+    bincls = ReductionBins(h5hd)
+    bincls.create_bins(arrQ)
+    bincls.write_to_file('reduction.bins.h5')
+
+    bincls2 = ReductionBins('reduction.bins.h5')
+
     with h5z.FileH5Z(fin) as h5f:
         frames = h5f['entry/data/data'][:]
-        avr, std, num = integrate_mp(frames, q_masks)
+        avr, std, num = integrate_mp(frames, bincls2.bin_masks)
     print(time.time() - t0)
 
     with open('data_826.dat', 'w') as fout:
