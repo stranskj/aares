@@ -410,8 +410,9 @@ class InstrumentFileH5(ABC):
         '''
         return []
 
+    @staticmethod
     @abstractmethod
-    def is_type(self,val):
+    def is_type(val):
         '''
         Method, which checks, if the item is of the proper type
 
@@ -547,7 +548,8 @@ class SaxspointH5(InstrumentFileH5):
         else:
             raise TypeError
 
-    def is_type(self,val):
+    @staticmethod
+    def is_type(val):
         '''
         Checks for attributes to validate SAXSpoint
         '''

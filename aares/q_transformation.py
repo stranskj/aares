@@ -396,7 +396,8 @@ class ArrayQ(h5z.SaxspointH5):
         out_q.attrs['long_name'] = 'Length of the q-vector corresponding to given pixel'
         self['/processing/q_vector/length'] = out_q
 
-    def is_type(self, val):
+    @staticmethod
+    def is_type(val):
         '''
         Check if the file is of the correct type.
         :param val:
@@ -568,4 +569,5 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    import sys
+    sys.exit(main())
