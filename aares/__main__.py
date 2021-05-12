@@ -17,7 +17,7 @@ import freephil as phil
 
 __version__ = aares.__version__
 
-prog_short_description = 'Another angular REduction for Saxs'
+prog_short_description = 'Another Angular REduction for SAXS'
 
 
 phil_core = phil.parse('''
@@ -27,13 +27,13 @@ input {
     .multiple = True
     }
 
-reduction {
-    include scope aares.integrate.phil_core
-}
 
-masking {
+    include scope aares.integrate.phil_core
+
+    include scope aares.q_transformation.phil_core
+    
     include scope aares.mask.phil_core
-}
+
     
 ''', process_includes=True)
 

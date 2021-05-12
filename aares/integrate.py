@@ -18,10 +18,14 @@ import numpy
 import math
 import aares
 import aares.power as pwr
+import aares.datafiles
+import aares.q_transformation
 
 import concurrent.futures
 import os, logging
 import freephil as phil
+
+program_short_description = 'Performs data reduction from 2D to 1D.'
 
 phil_core_str = '''
 reduction
@@ -60,19 +64,45 @@ reduction
         .expert_level=1
         .help = Value, to which all the frames are scaled. If None, value from the first frame is chosen in such a way, that the scale of that frame is 1. (not implemented yet)
     }
+    
+    file_bins = None
+    .type = path
+    .help = File containing binning and reduction masks (output of previous aares.integrate).
+    .expert_level=1
 }     
 '''
 
 phil_core = phil.parse(phil_core_str)
 
 phil_job_core = phil.parse('''
-    input.file_name = None
+    include scope aares.common.phil_input_files
+    
+    input {
+    file_name = None
     .multiple = True
     .type = path
+    .help =  Files with the data to be processed. It needs to be explicit file name. Use "aares.import" for more complex file search and handling.
     
+    q_space = None
+    .type = path
+    .help = File containing Q-transformation information (output of aares.q_transformation)
+    
+    mask = None
+    .type = path
+    .help = PNG file with mask (output from aares.mask)
+    
+    
+    }
+    
+    output {
+        dir = 'reduced'
+        .type = path
+        .help = Output path
+    }
 
     ''' + phil_core_str + '''
     
+    include scope aares.power.phil_job_control
 ''', process_includes=True)
 
 
@@ -305,7 +335,8 @@ class ReductionBins(h5z.SaxspointH5):
             self.attrs['aares_version'] = str(aares.version)
             self.attrs['aares_detector_class'] = 'SaxspointH5'
 
-    def is_type(self, val):
+    @staticmethod
+    def is_type(val):
         '''
         Check if the file is of the correct type.
         :param val:
@@ -415,6 +446,98 @@ class ReductionBins(h5z.SaxspointH5):
         dts.attrs['long_name'] = 'Description of q-axis.'
         self['/processing/reduction/q_axis'] = dts
 
+class JobReduction(aares.Job):
+
+    def __set_meta__(self):
+        super().__set_meta__()
+        self._program_short_description = program_short_description
+
+    def __set_system_phil__(self):
+        self.system_phil = phil_job_core
+
+    def __help_epilog__(self):
+        pass
+
+    def __argument_processing__(self):
+        pass
+
+    def __process_unhandled__(self):
+        for param in self.unhandled:
+            if aares.datafiles.is_fls(param):
+                self.params.input_files = param
+            elif h5z.is_h5_file(param):
+                if h5z.SaxspointH5.is_type(param):
+                    self.params.input.file_name.append(param)
+                elif aares.q_transformation.ArrayQ.is_type(param):
+                    self.params.input.q_space = param
+                elif ReductionBins.is_type(param):
+                    self.params.reduction.file_bins = param #TODO: check that it works, once some bins are being produced
+                else:
+                    raise aares.RuntimeErrorUser('Unknown type of H5 file: {}'.format(param))
+            elif os.path.splitext(param)[1].lower() == '.png':
+                self.params.input.mask = param
+            else:
+                raise aares.RuntimeErrorUser('Unknown input: {}'.format(param))
+
+
+        # if len(self.unhandled) > 0:  # First file is input file
+        #     if h5z.is_h5_file(self.unhandled[0]):
+        #         self.params.input = self.unhandled[0]
+        #     elif aares.datafiles.is_fls(self.unhandled[0]):
+        #         self.params.input_files = self.unhandled[0]
+        #     else:
+        #         raise aares.RuntimeErrorUser('Unknown input: {}'.format(self.unhandled))
+        #
+        # if len(self.unhandled) == 2:  # Second file is output file
+        #     root, ext = os.path.splitext(self.unhandled[1])
+        #     if not 'h5a' in ext:
+        #         raise aares.RuntimeErrorUser(
+        #             'This should be output file in h5a-format: {}'.format(self.unhandled[1]))
+        #     self.params.output = self.unhandled[1]
+        # elif len(self.unhandled) > 2:
+        #     raise aares.RuntimeErrorUser('Too many input parameters.')
+        # else:
+        #     pass
+
+    def __worker__(self):
+        pass
+
+    # def __worker__(self):
+    #
+    #     if (((self.params.input is not None) and (self.params.input_files is not None)) or
+    #             ((self.params.input is None) and (self.params.input_files is None))):
+    #         raise aares.RuntimeErrorUser(
+    #             'Exactly one of the parameters has to be set:\n\tinput\n\tinput_files')
+    #
+    #     if (self.params.input_files is not None) and (self.params.output is not None):
+    #         logging.warning(
+    #             'Output keyword is ignored, definitions from {} are used instead.'.format(
+    #                 self.params.input_files))
+    #
+    #     to_process = []
+    #     if self.params.input_files is not None:
+    #         imported_files = aares.datafiles.DataFilesCarrier(file_phil=self.params.input_files,
+    #                                                           mainphil=phil_core)
+    #         for group in imported_files.file_groups:
+    #             if group.q_space is None:
+    #                 group.q_space = group.name + '.q_space.h5a'
+    #
+    #             to_process.append(
+    #                 (group.q_space, ArrayQ(imported_files.files_dict[group.geometry])))
+    #     elif self.params.input is not None:
+    #         if self.params.output is None:
+    #             self.params.output = self.params.input + '.q_space.h5a'
+    #         aares.my_print('Reading file header...')
+    #         to_process.append((self.params.output, ArrayQ(self.params.input)))
+    #     else:
+    #         raise AssertionError
+    #
+    #     aares.my_print('Performing Q-transformation')
+    #     for fout, arrQ in to_process:
+    #         arrQ.calculate_q()
+    #         aares.my_print('Writing: {}'.format(fout))
+    #         arrQ.write_to_file(fout)
+
 def test():
     import aares.q_transformation as qt
     import time
@@ -482,8 +605,12 @@ def test():
 
 
 def main():
-    test()
+    #test()
+    job = JobReduction()
+    return job.job_exit
 
 
 if __name__ == '__main__':
-    main()
+    import sys
+
+    sys.exit(main())
