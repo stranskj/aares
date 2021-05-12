@@ -75,6 +75,12 @@ class MainJob(aares.Job):
     Run class based on generic AAres run class
     """
 
+    def __argument_processing__(self):
+        pass
+
+    def __process_unhandled__(self):
+        pass
+
     def __set_meta__(self):
         """
         Metadata for . See aares.Job for predefined defaults
