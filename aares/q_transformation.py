@@ -487,6 +487,8 @@ class JobQtrasform(aares.Job):
 
                 to_process.append(
                     (group.q_space, ArrayQ(imported_files.files_dict[group.geometry])))
+            aares.my_print('Updating {}...'.format(self.params.input_files))
+            imported_files.write_groups(self.params.input_files)
         elif self.params.input is not None:
             if self.params.output is None:
                 self.params.output = self.params.input + '.q_space.h5a'
@@ -500,6 +502,7 @@ class JobQtrasform(aares.Job):
             arrQ.calculate_q()
             aares.my_print('Writing: {}'.format(fout))
             arrQ.write_to_file(fout)
+
 
 
 def test(fin):

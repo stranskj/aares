@@ -24,7 +24,7 @@ group_phil_str = '''
 
     q_space = None
     .type = path
-    .help = File with detector transformed to Q space.
+    .help = File with detector transformed to Q space (Output of aares.q_transformation).
     
     phil = None
     .type = path
@@ -602,11 +602,16 @@ class DataFilesCarrier:
         self.files_dict = sorted_dict
 
 
-    def write_groups(self,file_out='files.fls'):
+    def write_groups(self,file_out='files.fls', update=True):
         '''
         Write the file groups to a file
         :return:
         '''
+
+        if update:
+            self.file_scope.group = []
+            for group in self.file_groups:
+                self.file_scope.group.append(group.scope_extract)
 
         try:
             group_out = self.file_scope
