@@ -275,10 +275,10 @@ class FileGroup():
             self.__group_phil = self._main_phil.extract()
             if self.phil is not None:
                 for fi in self.phil:
-                    try:
-                        with open(fi,'r') as fin:
-                            self.__group_phil = self._main_phil.fetch(fin).extract()
-                    except OSError:
+                    if os.path.isfile(fi):
+                        fin = phil.parse(file_name=fi)
+                        self.__group_phil = self._main_phil.fetch(fin).extract()
+                    else:
                         logging.warning('File does not exist, skipping: {}'.format(fi))
 
         return self.__group_phil
@@ -286,6 +286,21 @@ class FileGroup():
     @group_phil.setter
     def group_phil(self,val):
         self.__group_phil = val
+
+    def update_group_phil(self,phil_in):
+        '''
+        Updates the groups phil configuration
+        :param phil_in:
+        :return:
+        '''
+
+        current = self._main_phil.format(self.group_phil)
+
+        if isinstance(phil_in,phil.scope_extract):
+            phil_in = self._main_phil.format(phil_in)
+
+        updated_scope = self._main_phil.fetch(sources=[current, phil_in]).extract()
+        self.__group_phil = updated_scope
 
     @property
     def geometry(self):
@@ -314,6 +329,8 @@ class FileGroup():
                 fout.write(work_scope.as_str())
         except PermissionError:
             raise aares.RuntimeErrorUser('Cannot write to file: {}'.format(file_name))
+
+        return file_name
 
     @property
     def scope_extract(self):

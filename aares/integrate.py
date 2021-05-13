@@ -20,6 +20,7 @@ import aares
 import aares.power as pwr
 import aares.datafiles
 import aares.q_transformation
+import aares.mask
 
 import concurrent.futures
 import os, logging
@@ -65,7 +66,7 @@ reduction
         .help = Value, to which all the frames are scaled. If None, value from the first frame is chosen in such a way, that the scale of that frame is 1. (not implemented yet)
     }
     
-    file_bins = None
+    file_bin_masks = None
     .type = path
     .help = File containing binning and reduction masks (output of previous aares.integrate).
     .expert_level=1
@@ -471,7 +472,7 @@ class JobReduction(aares.Job):
                 elif aares.q_transformation.ArrayQ.is_type(param):
                     self.params.input.q_space = param
                 elif ReductionBins.is_type(param):
-                    self.params.reduction.file_bins = param #TODO: check that it works, once some bins are being produced
+                    self.params.reduction.file_bins = param
                 else:
                     raise aares.RuntimeErrorUser('Unknown type of H5 file: {}'.format(param))
             elif os.path.splitext(param)[1].lower() == '.png':
@@ -500,7 +501,56 @@ class JobReduction(aares.Job):
         #     pass
 
     def __worker__(self):
-        pass
+
+        if self.params.input_files is not None:
+            imported_files = aares.datafiles.DataFilesCarrier(file_phil=self.params.input_files,
+                                                              mainphil=phil_core)
+
+            user_reduction_phil = phil_core.format(self.params)
+            user_diff = phil_core.fetch_diff(user_reduction_phil)
+            for group in imported_files.file_groups:
+                aares.my_print('Preparing bins for {}...'.format(group.name))
+                group_write = False
+                if user_diff.as_str() != '':
+                    group.update_group_phil(user_diff)
+                    group_write = True
+
+                if group.mask is not None: #TODO: maybe allow multiple?
+                    aares.my_print('Reading mask...')
+                    frame_mask = aares.mask.read_mask_from_image(group.mask)
+                else:
+                    frame_mask = None
+
+                if group.group_phil.reduction.file_bin_masks is not None \
+                        and os.path.isfile(group.group_phil.reduction.file_bin_masks) \
+                        and (not group_write): #TODO: only if binnig parameters did not change.... No skipped when other like "beamstop" used
+                    aares.my_print('Reading from file {}...'.format(group.group_phil.reduction.file_bin_masks))
+                    group_bins = ReductionBins(group.group_phil.reduction.file_bin_masks)
+                else:
+                    aares.my_print('Reading q-space values...')
+                    arrQ = aares.q_transformation.ArrayQ(group.q_space)
+                    group_bins = ReductionBins(arrQ)
+                    group_bins.create_bins(arrQ.q_length,
+                                           qmin=group.group_phil.reduction.q_range[0],
+                                           qmax=group.group_phil.reduction.q_range[0],
+                                           bins=group.group_phil.reduction.bins_number,
+                                           frame_mask = frame_mask)
+
+                    if group.group_phil.reduction.file_bin_masks is None:
+                        group.group_phil.reduction.file_bin_masks = group.name + '.bins.h5a'
+                        group_write = True
+
+                    aares.my_print('Binning mask for the group written to: {}'.format(group.group_phil.reduction.file_bin_masks))
+                    group_bins.write(group.group_phil.reduction.file_bin_masks)
+
+                if group_write:
+                    phil_out = group.write()
+                    aares.my_print('Updated group work PHIL written to: {}'.format(phil_out))
+
+            imported_files.write_groups(file_out=self.params.input_files) #TODo: maybe new file name?
+
+        else:
+            raise aares.RuntimeWarningUser('Not implemented yet, please use aares.import -> aares.q_transformation')
 
     # def __worker__(self):
     #
