@@ -458,7 +458,7 @@ class ReductionBins(h5z.SaxspointH5):
 
     @property
     def qmax(self):
-        return min(self.q_axis)
+        return max(self.q_axis)
 
 class JobReduction(aares.Job):
 
