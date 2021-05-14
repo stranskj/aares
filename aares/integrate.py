@@ -91,14 +91,15 @@ phil_job_core = phil.parse('''
     mask = None
     .type = path
     .help = PNG file with mask (output from aares.mask)
-    
-    
     }
     
     output {
         dir = 'reduced'
         .type = path
-        .help = Output path
+        .help = Output folder for the processed data
+        input_files = binned.fls
+        .type = path
+        .help = Updated descriptor of the input files.
     }
 
     ''' + phil_core_str + '''
@@ -281,9 +282,9 @@ def prepare_bins(arrQ, qmin=None, qmax=None, bins=None, frame_mask=None):
     if frame_mask is None:
         frame_mask = arrQ > 0
 
-    if qmin is None:
+    if qmin is None or qmin == 0:
         qmin = arrQ[frame_mask].min()
-    if qmax is None:
+    if qmax is None or qmax == 0:
         qmax = arrQ[frame_mask].max()
 
     if (bins is None) or (bins == 0):
@@ -447,6 +448,18 @@ class ReductionBins(h5z.SaxspointH5):
         dts.attrs['long_name'] = 'Description of q-axis.'
         self['/processing/reduction/q_axis'] = dts
 
+    @property
+    def number_bins(self):
+        return len(self.bin_masks)
+
+    @property
+    def qmin(self):
+        return min(self.q_axis)
+
+    @property
+    def qmax(self):
+        return min(self.q_axis)
+
 class JobReduction(aares.Job):
 
     def __set_meta__(self):
@@ -515,6 +528,10 @@ class JobReduction(aares.Job):
                     group.update_group_phil(user_diff)
                     group_write = True
 
+                if self.params.input.mask is not None:
+                    group.mask = self.params.input.mask
+                    group_write = True
+
                 if group.mask is not None: #TODO: maybe allow multiple?
                     aares.my_print('Reading mask...')
                     frame_mask = aares.mask.read_mask_from_image(group.mask)
@@ -532,13 +549,19 @@ class JobReduction(aares.Job):
                     group_bins = ReductionBins(arrQ)
                     group_bins.create_bins(arrQ.q_length,
                                            qmin=group.group_phil.reduction.q_range[0],
-                                           qmax=group.group_phil.reduction.q_range[0],
+                                           qmax=group.group_phil.reduction.q_range[1],
                                            bins=group.group_phil.reduction.bins_number,
                                            frame_mask = frame_mask)
 
                     if group.group_phil.reduction.file_bin_masks is None:
                         group.group_phil.reduction.file_bin_masks = group.name + '.bins.h5a'
                         group_write = True
+
+                    aares.my_print('Data were split into {bins} bins, spaning q-range from {qmin:.3f} nm-1 to {qmax:.2f} nm-1'.format(
+                        bins = group_bins.number_bins,
+                        qmin = group_bins.qmin, #TODO:  q range is reporting weird
+                        qmax = group_bins.qmax
+                    ))
 
                     aares.my_print('Binning mask for the group written to: {}'.format(group.group_phil.reduction.file_bin_masks))
                     group_bins.write(group.group_phil.reduction.file_bin_masks)
@@ -547,7 +570,9 @@ class JobReduction(aares.Job):
                     phil_out = group.write()
                     aares.my_print('Updated group work PHIL written to: {}'.format(phil_out))
 
-            imported_files.write_groups(file_out=self.params.input_files) #TODo: maybe new file name?
+            if self.params.output.input_files is None:
+                self.params.output.input_files = 'binned.fls'
+            imported_files.write_groups(file_out=self.params.output.input_files)
 
         else:
             raise aares.RuntimeWarningUser('Not implemented yet, please use aares.import -> aares.q_transformation')
