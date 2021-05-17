@@ -458,7 +458,7 @@ class ReductionBins(h5z.SaxspointH5):
 
     @property
     def qmax(self):
-        return min(self.q_axis)
+        return max(self.q_axis)
 
 class JobReduction(aares.Job):
 
@@ -559,7 +559,7 @@ class JobReduction(aares.Job):
 
                     aares.my_print('Data were split into {bins} bins, spaning q-range from {qmin:.3f} nm-1 to {qmax:.2f} nm-1'.format(
                         bins = group_bins.number_bins,
-                        qmin = group_bins.qmin, #TODO:  q range is reporting weird
+                        qmin = group_bins.qmin,
                         qmax = group_bins.qmax
                     ))
 
@@ -576,6 +576,8 @@ class JobReduction(aares.Job):
 
         else:
             raise aares.RuntimeWarningUser('Not implemented yet, please use aares.import -> aares.q_transformation')
+
+
 
     # def __worker__(self):
     #
