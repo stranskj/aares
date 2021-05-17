@@ -157,22 +157,22 @@ def beam_bin_mask(q_range=None, real_space=None, arrQ=None, pixel_size=None):
     :return: Integration mask
     """
 
-    assert (q_range is not None or real_space is not None) and not (q_range is not None and real_space is not None)
+    assert (q_range is not None or real_space is not None) and not (
+                q_range is not None and real_space is not None)
 
     bin_mask = arrQ == False
     if real_space is not None:
         assert pixel_size is not None
         import aares.mask
         beam_xy = numpy.unravel_index(numpy.argmin(arrQ, axis=None), arrQ.shape)
-        beamstop_pix_size = sorted((real_space[0]/pixel_size,real_space[1]/pixel_size))
+        beamstop_pix_size = sorted((real_space[0] / pixel_size, real_space[1] / pixel_size))
 
-        inner = aares.mask.beamstop_hole(beam_xy,beamstop_pix_size[0],bin_mask)
-        outer = aares.mask.beamstop_hole(beam_xy,beamstop_pix_size[1],bin_mask)
+        inner = aares.mask.beamstop_hole(beam_xy, beamstop_pix_size[0], bin_mask)
+        outer = aares.mask.beamstop_hole(beam_xy, beamstop_pix_size[1], bin_mask)
 
         bin_mask = numpy.logical_and(outer, numpy.logical_not(inner))
     else:
-        bin_mask = integration_mask(q_range,arrQ)
-
+        bin_mask = integration_mask(q_range, arrQ)
 
     return bin_mask
 
@@ -205,13 +205,13 @@ def integrate(frame_arr, bin_masks):
         bin_masks.shape = (1, *bin_masks.shape)
 
     averages = []
-    stdev    = []
-    num      = []
+    stdev = []
+    num = []
 
     for binm in bin_masks:
         #   int_mask = numpy.array([binm]*no_frame)
         binval = frame_arr[:, binm]
-        binval = binval[binval>=0] #TODO: performance hit needs checking
+        binval = binval[binval >= 0]  # TODO: performance hit needs checking
         if binval.size <= 0:
             averages.append(numpy.nan)
             stdev.append(numpy.nan)
@@ -253,11 +253,71 @@ def integrate_mp(frame_arr, bin_masks, nproc=None):
 
         res = numpy.concatenate(list(results), axis=1)
 
-        averages = res[0,:]
-        stdev    = res[1,:]
-        num      = res[2,:]
+        averages = res[0, :]
+        stdev = res[1, :]
+        num = res[2, :]
 
     return averages, stdev, num
+
+
+def integrate_group(group, data_dictionary, job_control=None):
+    '''
+    Integrates group of files
+
+    :param group: Group of files to be processed
+    :type group: aares.datafiles.FileGroup
+    :param data_dictionary: Dictionary with the file headers.
+    :type data_dictionary:
+
+    '''
+
+    if job_control is None:
+        job_control = pwr.phil_job_control.extract().job_control
+        job_control.threads, job_control.jobs = pwr.get_cpu_distribution(job_control)
+
+    params = group.group_phil
+
+    normalize_beam = (params.reduction.beam_normalize.real_space is not None
+                      or
+                      params.reduction.beam_normalize.q_range is not None)
+    if normalize_beam and (params.reduction.beam_normalize.real_space is not None
+                           and
+                           params.reduction.beam_normalize.q_range is not None):
+        raise aares.RuntimeErrorUser('Please provide only one '
+                                     'of:\nintegrate.beam_normalize.real_space\nintegrate'
+                                     '.beam_normalize.q_range')
+
+    if not normalize_beam and params.mask.beamstop.semitransparent is not None:
+        normalize_beam = True
+        params.reduction.beam_normalize.real_space = [0, params.mask.beamstop.semitransparent]
+
+    if params.reduction.beam_normalize.real_space is not None:
+        params.reduction.beam_normalize.real_space = numpy.array(
+            params.reduction.beam_normalize.real_space) * 0.001 / 2
+
+    aares.my_print('Reading bin masks: {}'.format(params.reduction.file_bin_masks))
+    bin_masks_obj = ReductionBins(params.reduction.file_bin_masks)
+    aares.my_print('Reading Q-space data: {}'.format(group.scope_extract.q_space))
+    arrQ = aares.q_transformation.ArrayQ(group.scope_extract.q_space)
+    if normalize_beam:
+        aares.my_print('Normalization to beam fluctuation will be performed.')
+
+        beam_mask = beam_bin_mask(
+            real_space=params.reduction.beam_normalize.real_space,
+            q_range=params.reduction.beam_normalize.q_range,
+            arrQ=arrQ.q_length,
+            pixel_size=data_dictionary[group.file[0].path].pixel_size[0])
+
+        bin_masks = numpy.append(bin_masks_obj.bin_masks, [beam_mask], axis=0)
+
+        if params.reduction.beam_normalize.scale is None:
+            scale, err, num = integrate(data_dictionary[group.file[0].path].data, [beam_mask])
+            params.reduction.beam_normalize.scale = scale[0]
+            aares.my_print('Normalization scale set to: {:.3f}'.format(scale[0]))
+    else:
+        bin_masks = bin_masks_obj.bin_masks
+
+    pass
 
 
 def prepare_bins(arrQ, qmin=None, qmax=None, bins=None, frame_mask=None):
@@ -300,10 +360,12 @@ def prepare_bins(arrQ, qmin=None, qmax=None, bins=None, frame_mask=None):
     q_masks = list_integration_masks(q_bins, arrQ, frame_mask)
     return qt.get_q_axis(q_bins), q_masks
 
+
 class ReductionBins(h5z.SaxspointH5):
     '''
     Integration bins class
     '''
+
     def __init__(self, source=None):
         '''
         If header is provided, the geometry is read; if path to file is provided, the header is read from the file and then treated as such, or the is read from the file.
@@ -318,7 +380,7 @@ class ReductionBins(h5z.SaxspointH5):
                source is None
 
         self._h5 = h5z.GroupH5(name='/')
-        #self.geometry_fields = []
+        # self.geometry_fields = []
         self.attrs['aares_version'] = str(aares.version)
         self.attrs['aares_file_type'] = 'reduction_bins'
 
@@ -332,8 +394,8 @@ class ReductionBins(h5z.SaxspointH5):
         if isinstance(source, h5z.SaxspointH5):
             self.attrs['aares_version'] = str(aares.version)
             self.attrs['aares_detector_class'] = 'SaxspointH5'
-            #self.read_geometry(source)
-        if isinstance(source,qt.ArrayQ):
+            # self.read_geometry(source)
+        if isinstance(source, qt.ArrayQ):
             self.attrs['aares_version'] = str(aares.version)
             self.attrs['aares_detector_class'] = 'SaxspointH5'
 
@@ -372,7 +434,7 @@ class ReductionBins(h5z.SaxspointH5):
         :return:
         '''
         self.read_header(fin)
-        #self.geometry_fields = self['entry'].walk()
+        # self.geometry_fields = self['entry'].walk()
         if not self.attrs['aares_version'] == str(aares.version):
             logging.warning('AAres version used and of the file does not match.')
 
@@ -387,7 +449,7 @@ class ReductionBins(h5z.SaxspointH5):
 
         self.write(fout, mode=mode, compression='gzip')
 
-    def create_bins(self, arrQ, **kwargs):#qmin=None, qmax=None, bins=None, frame_mask=None):
+    def create_bins(self, arrQ, **kwargs):  # qmin=None, qmax=None, bins=None, frame_mask=None):
         '''
         Performs binning. Calculates integration masks and stores the masks
 
@@ -422,7 +484,7 @@ class ReductionBins(h5z.SaxspointH5):
         return arrQ
 
     @bin_masks.setter
-    def bin_masks(self,val):
+    def bin_masks(self, val):
         data = h5z.DatasetH5(val, name='/processing/reduction/bin_masks')
         data.attrs['units'] = 'bool'
         data.attrs['long_name'] = 'Set of mask used for data reduction step.'
@@ -442,7 +504,7 @@ class ReductionBins(h5z.SaxspointH5):
         return data
 
     @q_axis.setter
-    def q_axis(self,val):
+    def q_axis(self, val):
         dts = h5z.DatasetH5(val, name='/processing/reduction/q_axis')
         dts.attrs['units'] = 'nm^-1'
         dts.attrs['long_name'] = 'Description of q-axis.'
@@ -459,6 +521,7 @@ class ReductionBins(h5z.SaxspointH5):
     @property
     def qmax(self):
         return max(self.q_axis)
+
 
 class JobReduction(aares.Job):
 
@@ -492,7 +555,6 @@ class JobReduction(aares.Job):
                 self.params.input.mask = param
             else:
                 raise aares.RuntimeErrorUser('Unknown input: {}'.format(param))
-
 
         # if len(self.unhandled) > 0:  # First file is input file
         #     if h5z.is_h5_file(self.unhandled[0]):
@@ -532,7 +594,7 @@ class JobReduction(aares.Job):
                     group.mask = self.params.input.mask
                     group_write = True
 
-                if group.mask is not None: #TODO: maybe allow multiple?
+                if group.mask is not None:  # TODO: maybe allow multiple?
                     aares.my_print('Reading mask...')
                     frame_mask = aares.mask.read_mask_from_image(group.mask)
                 else:
@@ -540,8 +602,10 @@ class JobReduction(aares.Job):
 
                 if group.group_phil.reduction.file_bin_masks is not None \
                         and os.path.isfile(group.group_phil.reduction.file_bin_masks) \
-                        and (not group_write): #TODO: only if binnig parameters did not change.... No skipped when other like "beamstop" used
-                    aares.my_print('Reading from file {}...'.format(group.group_phil.reduction.file_bin_masks))
+                        and (
+                not group_write):  # TODO: only if binnig parameters did not change.... No skipped when other like "beamstop" used
+                    aares.my_print(
+                        'Reading from file {}...'.format(group.group_phil.reduction.file_bin_masks))
                     group_bins = ReductionBins(group.group_phil.reduction.file_bin_masks)
                 else:
                     aares.my_print('Reading q-space values...')
@@ -551,19 +615,21 @@ class JobReduction(aares.Job):
                                            qmin=group.group_phil.reduction.q_range[0],
                                            qmax=group.group_phil.reduction.q_range[1],
                                            bins=group.group_phil.reduction.bins_number,
-                                           frame_mask = frame_mask)
+                                           frame_mask=frame_mask)
 
                     if group.group_phil.reduction.file_bin_masks is None:
                         group.group_phil.reduction.file_bin_masks = group.name + '.bins.h5a'
                         group_write = True
 
-                    aares.my_print('Data were split into {bins} bins, spaning q-range from {qmin:.3f} nm-1 to {qmax:.2f} nm-1'.format(
-                        bins = group_bins.number_bins,
-                        qmin = group_bins.qmin, #TODO:  q range is reporting weird
-                        qmax = group_bins.qmax
-                    ))
+                    aares.my_print(
+                        'Data were split into {bins} bins, spaning q-range from {qmin:.3f} nm-1 to {qmax:.2f} nm-1'.format(
+                            bins=group_bins.number_bins,
+                            qmin=group_bins.qmin,
+                            qmax=group_bins.qmax
+                        ))
 
-                    aares.my_print('Binning mask for the group written to: {}'.format(group.group_phil.reduction.file_bin_masks))
+                    aares.my_print('Binning mask for the group written to: {}'.format(
+                        group.group_phil.reduction.file_bin_masks))
                     group_bins.write(group.group_phil.reduction.file_bin_masks)
 
                 if group_write:
@@ -575,7 +641,14 @@ class JobReduction(aares.Job):
             imported_files.write_groups(file_out=self.params.output.input_files)
 
         else:
-            raise aares.RuntimeWarningUser('Not implemented yet, please use aares.import -> aares.q_transformation')
+            raise aares.RuntimeWarningUser(
+                'Not implemented yet, please use aares.import -> aares.q_transformation')
+
+        for group in imported_files.file_groups:
+            aares.my_print('Reducing files in group {}:'.format(group.name))
+
+            integrate_group(group, imported_files.files_dict,
+                            job_control=None)  # TODO: prepare job_control
 
     # def __worker__(self):
     #
@@ -613,6 +686,7 @@ class JobReduction(aares.Job):
     #         aares.my_print('Writing: {}'.format(fout))
     #         arrQ.write_to_file(fout)
 
+
 def test():
     import aares.q_transformation as qt
     import time
@@ -627,7 +701,7 @@ def test():
         am.read_mask_from_image('frame_alpha_mask.png', channel='A', invert=True),
         am.detector_chip_mask(det_type='Eiger R 1M'))
 
-    #frame_mask = am.read_mask_from_image('frame_alpha_mask.png',channel='A',invert=True)
+    # frame_mask = am.read_mask_from_image('frame_alpha_mask.png',channel='A',invert=True)
 
     t0 = time.time()
     arrQ = qt.transform_detector_radial_q(h5hd)
@@ -656,22 +730,21 @@ def test():
     import aares.statistics as stats
     import aares.draw2d as draw2d
 
-  #  q_averages = stats.averages_to_frame_bins(q_masks, avr)
-  #  q_stdevs = stats.averages_to_frame_bins(q_masks, std)
-  #  draw2d.draw(q_averages,'frame_averages.png',Imax=1)
+    #  q_averages = stats.averages_to_frame_bins(q_masks, avr)
+    #  q_stdevs = stats.averages_to_frame_bins(q_masks, std)
+    #  draw2d.draw(q_averages,'frame_averages.png',Imax=1)
 
-   # relative_dev_pix = stats.local_relative_deviation(frames[0], q_averages, window=15)
-   # draw2d.draw(relative_dev_pix,'pix_dev.png', Imax=3, Imin=-3, cmap='PiYG')
+    # relative_dev_pix = stats.local_relative_deviation(frames[0], q_averages, window=15)
+    # draw2d.draw(relative_dev_pix,'pix_dev.png', Imax=3, Imin=-3, cmap='PiYG')
 
     cc12 = []
     bin_sz = 5
-    for chnk in pwr.chunks(q_masks,bin_sz):
-        cc12.append(stats.set_cc12(frames[0],chnk))
+    for chnk in pwr.chunks(q_masks, bin_sz):
+        cc12.append(stats.set_cc12(frames[0], chnk))
 
-    with open('cc12.dat','w') as fout:
-        for i, cc in zip(range(int(750/bin_sz)),cc12):
-            fout.write('{} {}\n'.format(q_vals[bin_sz*i],cc))
-
+    with open('cc12.dat', 'w') as fout:
+        for i, cc in zip(range(int(750 / bin_sz)), cc12):
+            fout.write('{} {}\n'.format(q_vals[bin_sz * i], cc))
 
     #   mask.draw_mask(q_masks[10],'q_mask10.png')
 
@@ -680,7 +753,7 @@ def test():
 
 
 def main():
-    #test()
+    # test()
     job = JobReduction()
     return job.job_exit
 
