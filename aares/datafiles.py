@@ -495,9 +495,6 @@ class DataFilesCarrier:
         else:
             self.read_headers()
 
-
-
-
     def _is_file_key(self, key):
         """
         Checks, if the key is available in the group.file scope
