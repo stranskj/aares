@@ -78,7 +78,7 @@ def integrate_file(header, q_masks, q_bins, start_frame=1, prefix='frame', numdi
     :param nproc: Number of CPUs to be used
     :param sep: Column separator in the output
     :return:
-    """
+"""
 
     if numdigit is None:
         numdigit = int(math.log10(len(header['entry/data/time']))) + 1
@@ -212,7 +212,7 @@ def run(params):
         if not os.path.isdir(params.sec.output.directory):
             try:
                 os.mkdir(params.sec.output.directory)
-            except:
+            except OSError:
                 raise aares.RuntimeErrorUser('Path is not a directory: {}'.format(params.sec.output.directory))
 
         from functools import partial

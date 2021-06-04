@@ -21,6 +21,7 @@ import aares.power as pwr
 import aares.datafiles
 import aares.q_transformation
 import aares.mask
+import aares.export
 
 import concurrent.futures
 import os, logging
@@ -93,8 +94,23 @@ phil_job_core = phil.parse('''
     .help = PNG file with mask (output from aares.mask)
     }
     
+    export {
+        separator = comma *space semicolon
+        .type = choice
+        .optional = False
+        .help = Separator to be used in the output file
+        file_name = original *name sample
+        .type = choice
+        .optional = False
+        .help = "How should be derived file name for the exported data. 
+                'original' - same as the source file name; 
+                'name' - same as the name in the AAres imported files;
+                'sample' - as sample name specified in data file header. A number is preceeded to guarantee uniquenes. No order is guaranteed."
+    }
+    
+    
     output {
-        dir = 'reduced'
+        directory = 'reduced'
         .type = path
         .help = Output folder for the processed data
         input_files = binned.fls
@@ -158,7 +174,7 @@ def beam_bin_mask(q_range=None, real_space=None, arrQ=None, pixel_size=None):
     """
 
     assert (q_range is not None or real_space is not None) and not (
-                q_range is not None and real_space is not None)
+            q_range is not None and real_space is not None)
 
     bin_mask = arrQ == False
     if real_space is not None:
@@ -260,7 +276,26 @@ def integrate_mp(frame_arr, bin_masks, nproc=None):
     return averages, stdev, num
 
 
-def integrate_group(group, data_dictionary, job_control=None):
+def process_file(header, file_out, export=None,
+                 bin_masks=None,
+                 q_val=None,
+                 scale=None,
+                 nproc=None):
+    averages, stddev, num = integrate_mp(header.data, bin_masks=bin_masks, nproc=nproc)
+    if scale is not None:
+        frame_scale = scale / averages[-1]
+        avrerages = averages[:-1] * frame_scale
+        stddev = stddev[:-1] * abs(frame_scale)
+        # avr = avr[:-1]
+        # std = std[:-1]
+        num = num[:-1]
+
+    aares.export.write_atsas(q_val, averages,stddev,
+                             file_name=file_out,
+                             header=['# {}'.format(header.path)])
+
+
+def integrate_group(group, data_dictionary, job_control=None, output=None, export=None):
     '''
     Integrates group of files
 
@@ -287,9 +322,9 @@ def integrate_group(group, data_dictionary, job_control=None):
                                      'of:\nintegrate.beam_normalize.real_space\nintegrate'
                                      '.beam_normalize.q_range')
 
-    if not normalize_beam and params.mask.beamstop.semitransparent is not None:
-        normalize_beam = True
-        params.reduction.beam_normalize.real_space = [0, params.mask.beamstop.semitransparent]
+  #  if not normalize_beam and params.mask.beamstop.semitransparent is not None: TODO: Check and think
+  #      normalize_beam = True
+  #      params.reduction.beam_normalize.real_space = [0, params.mask.beamstop.semitransparent]
 
     if params.reduction.beam_normalize.real_space is not None:
         params.reduction.beam_normalize.real_space = numpy.array(
@@ -317,7 +352,27 @@ def integrate_group(group, data_dictionary, job_control=None):
     else:
         bin_masks = bin_masks_obj.bin_masks
 
-    pass
+    if not os.path.isdir(output.directory):
+        try:
+            os.mkdir(output.directory)
+        except OSError:
+            raise aares.RuntimeErrorUser('Path is not a directory: {}'.format(output.directory))
+
+    from functools import partial
+    process_partial = partial(process_file,
+                              export=export,
+                              bin_masks=bin_masks,
+                              q_val=bin_masks_obj.q_axis,
+                              scale=params.reduction.beam_normalize.scale
+                              )
+
+    files = [data_dictionary[fi.path] for fi in group.scope_extract.file]
+    files_out = [os.path.join(output.directory, fi.name + '.dat')
+                 for fi in group.scope_extract.file]  # TODO: use info from export or so
+    aares.power.map_mp(process_partial,
+                       files,
+                       files_out
+                       )
 
 
 def prepare_bins(arrQ, qmin=None, qmax=None, bins=None, frame_mask=None):
@@ -603,7 +658,7 @@ class JobReduction(aares.Job):
                 if group.group_phil.reduction.file_bin_masks is not None \
                         and os.path.isfile(group.group_phil.reduction.file_bin_masks) \
                         and (
-                not group_write):  # TODO: only if binnig parameters did not change.... No skipped when other like "beamstop" used
+                        not group_write):  # TODO: only if binnig parameters did not change.... No skipped when other like "beamstop" used
                     aares.my_print(
                         'Reading from file {}...'.format(group.group_phil.reduction.file_bin_masks))
                     group_bins = ReductionBins(group.group_phil.reduction.file_bin_masks)
@@ -648,7 +703,9 @@ class JobReduction(aares.Job):
             aares.my_print('Reducing files in group {}:'.format(group.name))
 
             integrate_group(group, imported_files.files_dict,
-                            job_control=None)  # TODO: prepare job_control
+                            job_control=None,
+                            export=self.params.export,
+                            output=self.params.output)  # TODO: prepare job_control
 
     # def __worker__(self):
     #
