@@ -142,7 +142,7 @@ def get_files(inpaths, suffixes):
                 file_list.extend(search_files(fi, suf))
         else:
             file_list.append(fi)
-    return file_list
+    return [os.path.normpath(fi) for fi in file_list]
 
 
 def files_to_groups(files, headers_to_match='entry/instrument/detector', ignore_merged=True):
@@ -525,7 +525,7 @@ class DataFilesCarrier:
         """
         for group in self.file_groups:
             for fi in group.file:
-                fi.name = fi.path
+                fi.name = os.path.abspath(fi.path)
 
         if strip_common:
             for group in self.file_groups:
@@ -533,14 +533,14 @@ class DataFilesCarrier:
                 if len(group.file) == 1:
                     group.file[0].name = os.path.splitext(os.path.split(group.file[0].path)[1])[0]
                 else:
-                    filepaths = [os.path.splitext(fi.path)[0] for fi in group.file]
+                    filepaths = [os.path.splitext(fi.name)[0] for fi in group.file]
                     common_path = os.path.commonpath(filepaths)
                     for fi in group.file:
                         if len(common_path) > 0:
-                            fi.name = fi.path.split(common_path)[1].strip('.\/_'+sep)
+                            fi.name = fi.name.split(common_path)[1].strip('.\/_'+sep+os.sep)
                         else:
                             fi.name = fi.path
-                        fi.name = os.path.splitext(fi.name)[0].replace('/','_')
+                        fi.name = os.path.splitext(fi.name)[0].replace(os.sep,'_')
 
                     common = longest_common([fi.name for fi in group.file])
                     for fi in group.file:
