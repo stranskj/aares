@@ -284,7 +284,7 @@ def process_file(header, file_out, export=None,
     averages, stddev, num = integrate_mp(header.data, bin_masks=bin_masks, nproc=nproc)
     if scale is not None:
         frame_scale = scale / averages[-1]
-        avrerages = averages[:-1] * frame_scale
+        averages = averages[:-1] * frame_scale
         stddev = stddev[:-1] * abs(frame_scale)
         # avr = avr[:-1]
         # std = std[:-1]
