@@ -261,7 +261,7 @@ def read_mask_from_image(image_in, channel='A', threshold=128, invert=False):
     return mask
 
 
-def draw_mask(mask, output='mask.png'):
+def draw_mask(mask, output='mask.png',invert=False):
     """
     Draws a mask to an image
 
@@ -270,7 +270,10 @@ def draw_mask(mask, output='mask.png'):
     :return:
     """
     size = mask.shape[::-1]
-    databytes = np.packbits(np.invert(np.ascontiguousarray(mask)), axis=1)
+    if invert:
+        databytes = np.packbits(np.invert(np.ascontiguousarray(mask)), axis=1)
+    else:
+        databytes = np.packbits(np.ascontiguousarray(mask), axis=1)
     img = PIL.Image.frombytes(mode='1', size=size, data=databytes)
     img_rgb = img.convert(mode='RGBA')
     img_rgb.putalpha(img)
