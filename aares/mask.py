@@ -26,7 +26,6 @@ import PIL.ImageOps
 import freephil as phil
 import h5z
 
-
 phil_core = phil.parse('''
 mask {
 file = None
@@ -121,22 +120,22 @@ detector
 }
 ''')
 
-
 detectors = {
-    'Eiger R 1M' : {
-        'shape' : (1065,1030),   # X,Y size of detector
-        'y_mask' : [
-            255,256,257,258,
-            513,514,515,516,
-            771,772,773,774
-                     ],
-        'x_mask' : [
-            255,256,257,258,
-            806,807,808,809
-                     ],
-        'range' : (0, int(math.pow(2,31)))
+    'Eiger R 1M': {
+        'shape': (1065, 1030),  # X,Y size of detector
+        'y_mask': [
+            255, 256, 257, 258,
+            513, 514, 515, 516,
+            771, 772, 773, 774
+        ],
+        'x_mask': [
+            255, 256, 257, 258,
+            806, 807, 808, 809
+        ],
+        'range': (0, int(math.pow(2, 31)))
     }
 }
+
 
 def beamstop_hole(beam_xy, hole_pixel_radius, beamstop_mask):
     '''
@@ -150,13 +149,14 @@ def beamstop_hole(beam_xy, hole_pixel_radius, beamstop_mask):
 
     i = np.arange(beamstop_mask.shape[0])
     j = np.arange(beamstop_mask.shape[1])
-    J,I = np.meshgrid(j,i)
+    J, I = np.meshgrid(j, i)
 
     circle = (I - beam_xy[0]) ** 2 + (J - beam_xy[1]) ** 2 < hole_pixel_radius ** 2
 
-    return np.logical_or(beamstop_mask,circle)
+    return np.logical_or(beamstop_mask, circle)
 
-def rough_beamstop(beam_xy, frame_size, beamstop_pixel_radius, tilt = None):
+
+def rough_beamstop(beam_xy, frame_size, beamstop_pixel_radius, tilt=None):
     """
     Creates rough beamstop mask based on position of beam and beamstop size (does not account for poteintialy rectangular pixels)
 
@@ -167,26 +167,25 @@ def rough_beamstop(beam_xy, frame_size, beamstop_pixel_radius, tilt = None):
     :return: np.ndarray
     """
 
-    #beamstop_pixel_radius = beamstop_size / pixel_size[0] / 2
+    # beamstop_pixel_radius = beamstop_size / pixel_size[0] / 2
 
     i = np.arange(frame_size[0])
     j = np.arange(frame_size[1])
-    J, I = np.meshgrid(j,i)
+    J, I = np.meshgrid(j, i)
 
     circle = (I - beam_xy[0]) ** 2 + (J - beam_xy[1]) ** 2 > beamstop_pixel_radius ** 2
-    neck_base_center = (0,frame_size[1] / 2)
+    neck_base_center = (0, frame_size[1] / 2)
     # beamstop is strip of points within distance from connection of beam center and middle of bottom edge.
     # the connection is ax + by + c =0
 
     try:
-        a = (beam_xy[1]-neck_base_center[1])
-        b = (neck_base_center[0]-beam_xy[0])
+        a = (beam_xy[1] - neck_base_center[1])
+        b = (neck_base_center[0] - beam_xy[0])
         c = -a * beam_xy[0] - b * beam_xy[1]
-        norm = math.sqrt(a**2 + b**2)
-        stick_y = np.abs(a * I + b*J +c ) > beamstop_pixel_radius * norm
+        norm = math.sqrt(a ** 2 + b ** 2)
+        stick_y = np.abs(a * I + b * J + c) > beamstop_pixel_radius * norm
     except ZeroDivisionError:
-        stick_y = np.abs(I-beam_xy[0]) > beamstop_pixel_radius
-
+        stick_y = np.abs(I - beam_xy[0]) > beamstop_pixel_radius
 
     # beamstop is below beam position only
     stick_x = I > beam_xy[0]
@@ -194,7 +193,8 @@ def rough_beamstop(beam_xy, frame_size, beamstop_pixel_radius, tilt = None):
     final_mask = np.logical_and(np.logical_or(stick_x, stick_y), circle)
     return final_mask
 
-def detector_chip_mask(shape = None, x_mask= [], y_mask = [], det_type = None):
+
+def detector_chip_mask(shape=None, x_mask=[], y_mask=[], det_type=None):
     '''
     Generates mask of pixels on chip boundaries
 
@@ -209,22 +209,25 @@ def detector_chip_mask(shape = None, x_mask= [], y_mask = [], det_type = None):
             x_mask = detector['x_mask']
             y_mask = detector['y_mask']
         except KeyError:
-            raise aares.RuntimeErrorUser('Unknown detector type: {}\nAvailable types: {}'.format(det_type, list(detectors.keys())))
+            raise aares.RuntimeErrorUser(
+                'Unknown detector type: {}\nAvailable types: {}'.format(det_type,
+                                                                        list(detectors.keys())))
 
     assert shape is not None
     assert x_mask is not None
     assert y_mask is not None
 
-    mask = np.ones(shape,dtype=bool)
+    mask = np.ones(shape, dtype=bool)
 
     for x in x_mask:
         mask[x] = False
     for y in y_mask:
-        mask[:,y] = False
+        mask[:, y] = False
 
     return mask
 
-def read_mask_from_image(image_in, channel='A', threshold =128, invert=False):
+
+def read_mask_from_image(image_in, channel='A', threshold=128, invert=False):
     '''
     Creates frame mask from a image; preferably PNG; light number is
     :param image_in: Input file name
@@ -248,7 +251,8 @@ def read_mask_from_image(image_in, channel='A', threshold =128, invert=False):
         raise aares.RuntimeErrorUser('Unsupported image for mask.')
 
     flipped = PIL.ImageOps.flip(img_mask)
-    mask_np = np.array(flipped.convert(mode='1').getdata()).reshape(img_mask.size[1], img_mask.size[0])
+    mask_np = np.array(flipped.convert(mode='1').getdata()).reshape(img_mask.size[1],
+                                                                    img_mask.size[0])
 
     if invert:
         mask = mask_np > 0
@@ -256,7 +260,8 @@ def read_mask_from_image(image_in, channel='A', threshold =128, invert=False):
         mask = mask_np < 1
     return mask
 
-def draw_mask(mask,output='mask.png'):
+
+def draw_mask(mask, output='mask.png'):
     """
     Draws a mask to an image
 
@@ -265,7 +270,7 @@ def draw_mask(mask,output='mask.png'):
     :return:
     """
     size = mask.shape[::-1]
-    databytes= np.packbits(np.invert(np.ascontiguousarray(mask)), axis=1)
+    databytes = np.packbits(np.invert(np.ascontiguousarray(mask)), axis=1)
     img = PIL.Image.frombytes(mode='1', size=size, data=databytes)
     img_rgb = img.convert(mode='RGBA')
     img_rgb.putalpha(img)
@@ -276,6 +281,7 @@ def draw_mask(mask,output='mask.png'):
 def pixel_mask_from_file(h5z_file):
     pixel_mask = h5z_file['entry/instrument/detector/pixel_mask'][:]
     return pixel_mask == 0
+
 
 def combine_masks(*list_of_masks):
     '''
@@ -289,9 +295,10 @@ def combine_masks(*list_of_masks):
 
     out_mask = list_of_masks[0]
     for mask in list_of_masks[1:]:
-        out_mask = np.logical_and(mask,out_mask)
+        out_mask = np.logical_and(mask, out_mask)
 
     return out_mask
+
 
 def composite_mask(work_phil, file_header=None):
     '''
@@ -317,7 +324,6 @@ def composite_mask(work_phil, file_header=None):
     if file_header is None:
         raise aares.RuntimeErrorUser('Missing file header. Please provide a data file.')
 
-
     # Pixel mask from the file
     if work_phil.pixel_mask:
         aares.my_print('Extracting pixel mask from the datafile...')
@@ -328,7 +334,7 @@ def composite_mask(work_phil, file_header=None):
         aares.my_print('Creating mask from file {}'.format(msk.file))
 
         if msk.file is None:
-            #TODO: Is there actually a way to fix it in Freephil?
+            # TODO: Is there actually a way to fix it in Freephil?
             raise aares.RuntimeErrorUser(''''Incomplete definition, parameter 'custom.file' is missing.
              
 HINT: If you are specifying more parameters for custom mask, please use a PHIL file as an input, which contains following for each custom mask:
@@ -358,11 +364,11 @@ custom {
             if work_phil.detector.exclude_lines.rows is None:
                 logging.warning('No pixel row defined to be excluded')
             else:
-                aares.my_print('Rows:    '+', '.join(work_phil.detector.exclude_lines.rows))
+                aares.my_print('Rows:    ' + ', '.join(work_phil.detector.exclude_lines.rows))
             if work_phil.detector.exclude_lines.columns is None:
                 logging.warning('No pixel column defined to be excluded')
             else:
-                aares.my_print('Columns: '+', '.join(work_phil.detector.exclude_lines.rows))
+                aares.my_print('Columns: ' + ', '.join(work_phil.detector.exclude_lines.rows))
 
             detector_type = None
 
@@ -371,7 +377,7 @@ custom {
             work_phil.detector.exclude_lines.rows,
             work_phil.detector.exclude_lines.columns,
             detector_type
-            ))
+        ))
 
     # Beamstop
 
@@ -385,15 +391,16 @@ custom {
         beamstop_mask = rough_beamstop(
             beam_xy=origin,
             frame_size=file_header.frame_size,
-            beamstop_pixel_radius=work_phil.beamstop.size/file_header.pixel_size[0]/2000,
+            beamstop_pixel_radius=work_phil.beamstop.size / file_header.pixel_size[0] / 2000,
             tilt=work_phil.beamstop.tilt
-            )
+        )
 
         if work_phil.beamstop.semitransparent is not None:
             aares.my_print('Applying cut-out for transparent beamstop...')
             beamstop_mask = beamstop_hole(
                 beam_xy=origin,
-                hole_pixel_radius=work_phil.beamstop.semitransparent/file_header.pixel_size[0]/2000,
+                hole_pixel_radius=work_phil.beamstop.semitransparent / file_header.pixel_size[
+                    0] / 2000,
                 beamstop_mask=beamstop_mask
             )
 
@@ -402,10 +409,14 @@ custom {
     aares.my_print('Merging masks...')
     return combine_masks(*masks)
 
+
 class JobMask(aares.Job):
     """
     Run class based on generic AAres run class
     """
+
+    def __process_unhandled__(self):
+        pass
 
     def __set_meta__(self):
         '''
@@ -422,10 +433,10 @@ class JobMask(aares.Job):
         The actual programme worker
         :return:
         '''
-        mask = composite_mask(self.params)
+        mask = composite_mask(self.params.mask)
 
-        aares.my_print('Saving the mask in the file: {}'.format(self.params.output))
-        draw_mask(mask,self.params.output)
+        aares.my_print('Saving the mask in the file: {}'.format(self.params.mask.output))
+        draw_mask(mask, self.params.mask.output)
 
     def __set_system_phil__(self):
         '''
@@ -448,11 +459,10 @@ class JobMask(aares.Job):
         pass
 
 
-
 def test():
-#    mask = detector_chip_mask('Eiger R 1M')
-#    draw_mask(mask,'chip_mask.png')
-#    mask = read_mask_from_image('frame_alpha_mask.png', 'A')
+    #    mask = detector_chip_mask('Eiger R 1M')
+    #    draw_mask(mask,'chip_mask.png')
+    #    mask = read_mask_from_image('frame_alpha_mask.png', 'A')
 
     test_phil = phil.parse('''
     pixel_mask = False
@@ -463,12 +473,13 @@ def test():
     work_extract = work_phil.extract()
     mask = composite_mask(work_extract)
     pass
-    draw_mask(mask,'test_mask.png')
+    draw_mask(mask, 'test_mask.png')
 
 
 def main():
     job = JobMask()
     return job.job_exit
+
 
 if __name__ == '__main__':
     main()
