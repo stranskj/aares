@@ -281,6 +281,8 @@ def process_file(header, file_out, export=None,
                  q_val=None,
                  scale=None,
                  nproc=None):
+
+    aares.my_print(header.path)
     averages, stddev, num = integrate_mp(header.data, bin_masks=bin_masks, nproc=nproc)
     if scale is not None:
         frame_scale = scale / averages[-1]
@@ -292,7 +294,7 @@ def process_file(header, file_out, export=None,
 
     aares.export.write_atsas(q_val, averages,stddev,
                              file_name=file_out,
-                             header=['# {}'.format(header.path)])
+                             header=['# {}\n'.format(header.path)])
 
 
 def integrate_group(group, data_dictionary, job_control=None, output=None, export=None):
@@ -358,6 +360,7 @@ def integrate_group(group, data_dictionary, job_control=None, output=None, expor
         except OSError:
             raise aares.RuntimeErrorUser('Path is not a directory: {}'.format(output.directory))
 
+    aares.my_print('Reducing files of {}:'.format(group.scope_extract.name))
     from functools import partial
     process_partial = partial(process_file,
                               export=export,
