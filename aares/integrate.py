@@ -348,7 +348,7 @@ def integrate_group(group, data_dictionary, job_control=None, output=None, expor
         bin_masks = numpy.append(bin_masks_obj.bin_masks, [beam_mask], axis=0)
 
         if params.reduction.beam_normalize.scale is None:
-            scale, err, num = integrate(data_dictionary[group.file[0].path].data, [beam_mask])
+            scale, err, num = integrate(data_dictionary[group.file[0].path].data, numpy.array([beam_mask]))
             params.reduction.beam_normalize.scale = scale[0]
             aares.my_print('Normalization scale set to: {:.3f}'.format(scale[0]))
     else:
