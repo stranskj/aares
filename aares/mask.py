@@ -258,6 +258,11 @@ def read_mask_from_image(image_in, channel='A', threshold=128, invert=False):
         mask = mask_np > 0
     else:
         mask = mask_np < 1
+
+    px_total = mask.size
+    px_used = mask[mask].size
+    px_ignored = px_total-px_used
+    aares.my_print("Mask read from {fin}. Pixels masked out: {ignored} ({perc:.2f} %).".format(fin=image_in, ignored=px_ignored, perc=100*px_ignored/px_total))
     return mask
 
 
@@ -269,6 +274,13 @@ def draw_mask(mask, output='mask.png',invert=False):
     :param output: str
     :return:
     """
+    px_total = mask.size
+    px_used = mask[mask].size
+    px_ignored = px_total - px_used
+    aares.my_print(
+        "Drawing mask to {fin}. Pixels masked out: {ignored} ({perc:.2f} %).".format(fin=output,
+                                                                                    ignored=px_ignored,
+                                                                                    perc=100 * px_ignored / px_total))
     size = mask.shape[::-1]
     if invert:
         databytes = np.packbits(np.invert(np.ascontiguousarray(mask)), axis=1)
