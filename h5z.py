@@ -544,7 +544,8 @@ class SaxspointH5(InstrumentFileH5):
 
             self.attrs['path'] = path
             self.update_abs_path()
-
+        elif not os.path.isfile(path):
+            raise OSError('File not found.')
         else:
             raise TypeError
 
