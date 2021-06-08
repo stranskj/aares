@@ -71,7 +71,7 @@ custom
     .type = choice
     .help = Image channel to be extracted as a mask
     
-    invert = True
+    invert = None
     .type = bool
     .help = Invert the resulting mask
     
@@ -227,7 +227,7 @@ def detector_chip_mask(shape=None, x_mask=[], y_mask=[], det_type=None):
     return mask
 
 
-def read_mask_from_image(image_in, channel='A', threshold=128, invert=False):
+def read_mask_from_image(image_in, channel='A', threshold=128, invert=None):
     '''
     Creates frame mask from a image; preferably PNG; light number is
     :param image_in: Input file name
@@ -254,10 +254,18 @@ def read_mask_from_image(image_in, channel='A', threshold=128, invert=False):
     mask_np = np.array(flipped.convert(mode='1').getdata()).reshape(img_mask.size[1],
                                                                     img_mask.size[0])
 
+    mask = mask_np > 1
+    if invert is None:
+        px_total = mask_np.size
+        px_used = mask_np[mask_np].size
+        if px_used > 0.5*px_total:
+            invert = False
+        else:
+            logging.info('More pixels would be ignore, inverting the mask. If this is not desired, specify "mask.custom.invert=False"')
+            invert = True
+
     if invert:
-        mask = mask_np > 0
-    else:
-        mask = mask_np < 1
+        mask = mask == False
 
     px_total = mask.size
     px_used = mask[mask].size
@@ -265,6 +273,18 @@ def read_mask_from_image(image_in, channel='A', threshold=128, invert=False):
     aares.my_print("Mask read from {fin}. Pixels masked out: {ignored} ({perc:.2f} %).".format(fin=image_in, ignored=px_ignored, perc=100*px_ignored/px_total))
     return mask
 
+def count_used_pixels(mask):
+    '''
+    Counts total number and number of pixels used after using the mash
+
+    :param mask: Input mask to by analysed
+    :type mask: numpy.array of bools
+    :return: tuple, first is number of pixels used, the second is total number of pixels
+    '''
+    px_total = mask.size
+    px_used = mask[mask].size
+
+    return px_used, px_total
 
 def draw_mask(mask, output='mask.png',invert=False):
     """
@@ -274,13 +294,13 @@ def draw_mask(mask, output='mask.png',invert=False):
     :param output: str
     :return:
     """
-    px_total = mask.size
-    px_used = mask[mask].size
+    px_used, px_total = count_used_pixels(mask)
     px_ignored = px_total - px_used
     aares.my_print(
         "Drawing mask to {fin}. Pixels masked out: {ignored} ({perc:.2f} %).".format(fin=output,
                                                                                     ignored=px_ignored,
                                                                                     perc=100 * px_ignored / px_total))
+
     size = mask.shape[::-1]
     if invert:
         databytes = np.packbits(np.invert(np.ascontiguousarray(mask)), axis=1)
@@ -292,6 +312,8 @@ def draw_mask(mask, output='mask.png',invert=False):
     flipped = PIL.ImageOps.flip(img_rgb)
     flipped.save(output)
 
+    if px_ignored > 0.3*px_total:
+        logging.warning('Significant portion of the detector is being masked out. Check your mask in {}'.format(output))
 
 def pixel_mask_from_file(h5z_file):
     pixel_mask = h5z_file['entry/instrument/detector/pixel_mask'][:]
@@ -333,8 +355,10 @@ def composite_mask(work_phil, file_header=None):
     if (work_phil.file is not None) and (file_header is None):
         try:
             file_header = h5z.SaxspointH5(work_phil.file)
-        except OSError:
+        except TypeError:
             raise aares.RuntimeErrorUser('Wrong file format. Please provide data file.')
+        except OSError:
+            raise aares.RuntimeErrorUser('File not found: {}'.format(work_phil.file))
 
     if file_header is None:
         raise aares.RuntimeErrorUser('Missing file header. Please provide a data file.')
