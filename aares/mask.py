@@ -460,7 +460,7 @@ class JobMask(aares.Job):
         for param in self.unhandled:
             import aares.datafiles
             if aares.datafiles.is_fls(param):
-                print('FLS file on input')
+                print('FLS file on input.')
             elif h5z.is_h5_file(param):
                 self.params.mask.file = param
             elif os.path.splitext(param)[1].lower() == '.png':
