@@ -25,6 +25,7 @@ import PIL.Image
 import PIL.ImageOps
 import freephil as phil
 import h5z
+import os
 
 phil_core = phil.parse('''
 mask {
@@ -455,7 +456,18 @@ class JobMask(aares.Job):
     """
 
     def __process_unhandled__(self):
-        pass
+
+        for param in self.unhandled:
+            import aares.datafiles
+            if aares.datafiles.is_fls(param):
+                print('FLS file on input')
+            elif h5z.is_h5_file(param):
+                self.params.mask.file = param
+            elif os.path.splitext(param)[1].lower() == '.png':
+                custom_extract = self.system_phil.fetch(source=phil.parse('mask.custom.file={}'.format(param))).extract()
+                self.params.mask.custom.extend(custom_extract.mask.custom)
+            else:
+                raise aares.RuntimeErrorUser('Unknown input: {}'.format(param))
 
     def __set_meta__(self):
         '''
