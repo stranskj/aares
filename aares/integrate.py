@@ -654,7 +654,10 @@ class JobReduction(aares.Job):
 
                 if group.mask is not None:  # TODO: maybe allow multiple?
                     aares.my_print('Reading mask...')
-                    frame_mask = aares.mask.read_mask_from_image(group.mask)
+                    frame_mask = aares.mask.read_mask_from_image(group.mask, channel='A', invert=False)
+                    px_used, px_total = aares.mask.count_used_pixels(frame_mask)
+                    if px_used < 0.3* px_total:
+                        logging.warning('Significant number of pixels will be ignored. Check your mask!')
                 else:
                     frame_mask = None
 
