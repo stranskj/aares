@@ -254,10 +254,10 @@ def read_mask_from_image(image_in, channel='A', threshold=128, invert=None):
     mask_np = np.array(flipped.convert(mode='1').getdata()).reshape(img_mask.size[1],
                                                                     img_mask.size[0])
 
-    mask = mask_np > 1
+    mask = mask_np < 1
     if invert is None:
-        px_total = mask_np.size
-        px_used = mask_np[mask_np].size
+        px_total = mask.size
+        px_used = mask[mask].size
         if px_used > 0.5*px_total:
             invert = False
         else:
@@ -286,7 +286,7 @@ def count_used_pixels(mask):
 
     return px_used, px_total
 
-def draw_mask(mask, output='mask.png',invert=False):
+def draw_mask(mask, output='mask.png',invert=True):
     """
     Draws a mask to an image
 
