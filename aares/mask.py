@@ -459,8 +459,10 @@ class JobMask(aares.Job):
 
         for param in self.unhandled:
             import aares.datafiles
-            if aares.datafiles.is_fls(param):
-                print('FLS file on input.')
+            if aares.datafiles.is_fls(param): #TODO: tohle by melo jit lepe, uz jen vytahnout z headru, co je potreba
+                dtfls = aares.datafiles.DataFilesCarrier(file_phil=param, mainphil=self.system_phil)
+                fls = list(dtfls.files_dict.keys())
+                self.params.mask.file = fls[0]
             elif h5z.is_h5_file(param):
                 self.params.mask.file = param
             elif os.path.splitext(param)[1].lower() == '.png':

@@ -587,7 +587,7 @@ class DataFilesCarrier:
         file_scope = self.get_file_scope(value, key)
         return self.files_dict[file_scope.path]
 
-    def files(self, key):
+    def files(self, key='name'):
         """
         Iterates over file keys
         :param key: Key to iterate over
