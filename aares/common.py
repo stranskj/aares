@@ -275,6 +275,8 @@ USAGE
             ):
                 try:
                     user_phils.append(phil.parse(file_name=arg))
+                except RuntimeError as e:
+                    raise RuntimeErrorUser(str(e))
                 except Exception:
                     if return_unhandled:
                         unhandled.append(arg)

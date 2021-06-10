@@ -475,7 +475,10 @@ class DataFilesCarrier:
 
         if isinstance(phil_in, str):
             if os.path.isfile(phil_in):
-                phil_in = phil.parse(file_name=phil_in)
+                try:
+                    phil_in = phil.parse(file_name=phil_in)
+                except RuntimeError as e:
+                    raise aares.RuntimeErrorUser(str(e))
             else:
                 raise aares.RuntimeErrorUser('File not found: {}'.format(phil_in))
 
