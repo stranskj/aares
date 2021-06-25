@@ -73,6 +73,8 @@ def draw(frame, fiout, Imax= '2*median', Imin=0, cmap='jet'):
             splited = tres.split('*')
             if splited[-1] == 'median':
                 val = numpy.median(frame)
+                if val == 0:
+                    val = 1
             elif splited[-1] == 'average':
                 val = numpy.average(frame)
             elif splited[-1] == 'max':
