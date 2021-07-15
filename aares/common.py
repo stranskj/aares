@@ -378,6 +378,10 @@ USAGE
             logging.error('ERROR: ' + str(e))
             self.job_exit = 2
 
+        except phil.Sorry as e:
+            logging.error(str(e))
+            self.job_exit = 1
+
         except Exception as e:
             logging.debug('''
 Program name:    {prog_name}
