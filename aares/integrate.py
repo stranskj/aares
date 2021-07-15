@@ -72,7 +72,7 @@ reduction
     .help = File containing binning and reduction masks (output of previous aares.integrate).
     .expert_level=1
     
-    empty_bins_skip = True
+    empty_skip = True
     .type = bool
     .help = If the bin contains zero pixels, it is ignored.
 }     
@@ -701,7 +701,7 @@ class JobReduction(aares.Job):
                                            qmax=group.group_phil.reduction.q_range[1],
                                            bins=group.group_phil.reduction.bins_number,
                                            frame_mask=frame_mask,
-                                               skip_empty=self.params.reduction.empty_bins_skip)
+                                            skip_empty=self.params.reduction.empty_skip)
                     except AttributeError:
                         raise aares.RuntimeErrorUser('Q-space data expeceted, but do not exist. Please run aares.q-transformation.')
 
