@@ -27,7 +27,7 @@ import concurrent.futures
 import os, logging
 import freephil as phil
 
-program_short_description = 'Performs data reduction from 2D to 1D.'
+prog_short_description = 'Performs data reduction from 2D to 1D.'
 
 phil_core_str = '''
 reduction
@@ -608,7 +608,7 @@ class JobReduction(aares.Job):
 
     def __set_meta__(self):
         super().__set_meta__()
-        self._program_short_description = program_short_description
+        self._program_short_description = prog_short_description
 
     def __set_system_phil__(self):
         self.system_phil = phil_job_core

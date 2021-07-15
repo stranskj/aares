@@ -52,7 +52,7 @@ def epilog():
                 module = importlib.import_module(ep.module_name)
                 return_str += ep.name + suffix + '\n\t' + module.prog_short_description + '\n\n'
             except:
-                return_str += 'Cannot find {}\nTry reinstall the package.'.format(ep.module_name)
+                return_str += 'Cannot find {}\nTry reinstall the package.\n\n'.format(ep.module_name)
     except Exception as e:
         logging.exception(e)
         return_str += 'Here is typically list of available commands. Something is wrong.'

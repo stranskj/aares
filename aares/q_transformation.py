@@ -9,7 +9,7 @@ import logging
 import freephil as phil
 import os
 
-program_short_description = 'Transforms file Q-space coordinates'
+prog_short_description = 'Transforms file Q-space coordinates'
 
 phil_core_str = '''
 q_transformation {
@@ -434,7 +434,7 @@ class JobQtrasform(aares.Job):
 
     def __set_meta__(self):
         super().__set_meta__()
-        self._program_short_description = program_short_description
+        self._program_short_description = prog_short_description
 
     def __set_system_phil__(self):
         self.system_phil = phil_prog
