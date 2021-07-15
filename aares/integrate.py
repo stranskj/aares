@@ -71,6 +71,10 @@ reduction
     .type = path
     .help = File containing binning and reduction masks (output of previous aares.integrate).
     .expert_level=1
+    
+    empty_bins_skip = True
+    .type = bool
+    .help = If the bin contains zero pixels, it is ignored.
 }     
 '''
 
@@ -378,7 +382,7 @@ def integrate_group(group, data_dictionary, job_control=None, output=None, expor
                        )
 
 
-def prepare_bins(arrQ, qmin=None, qmax=None, bins=None, frame_mask=None):
+def prepare_bins(arrQ, qmin=None, qmax=None, bins=None, frame_mask=None, skip_empty=True):
     """
     High level function, which prepares q_bins and integration masks
 
@@ -392,6 +396,8 @@ def prepare_bins(arrQ, qmin=None, qmax=None, bins=None, frame_mask=None):
     :type bins: int
     :param frame_mask: Additional mask for the frame.
     :type frame_mask: np.array(bools)
+    :param skip_empty: If the bin contains zero pixels, the bin is not created.
+    :type skip_empty: Bool
     :return: Returns array of q_values, and corresponding list of masks used for the integration
     """
 
@@ -416,6 +422,23 @@ def prepare_bins(arrQ, qmin=None, qmax=None, bins=None, frame_mask=None):
 
     q_bins = create_bins(qmin, qmax, bins)
     q_masks = list_integration_masks(q_bins, arrQ, frame_mask)
+
+    if skip_empty:
+        bins_prune = []
+        mask_prune = []
+        skipping = 0
+        for bin, mask in zip(q_bins, q_masks):
+            if numpy.any(mask):
+                bins_prune.append(bin)
+                mask_prune.append(mask)
+            else:
+                skipping += 1
+
+        q_bins = bins_prune
+        q_masks = mask_prune
+        if skipping > 0:
+            logging.warning('Empty bins ({}) were encountered and skipped.'.format(skipping))
+
     return qt.get_q_axis(q_bins), q_masks
 
 
@@ -672,11 +695,15 @@ class JobReduction(aares.Job):
                     aares.my_print('Reading q-space values...')
                     arrQ = aares.q_transformation.ArrayQ(group.q_space)
                     group_bins = ReductionBins(arrQ)
-                    group_bins.create_bins(arrQ.q_length,
+                    try:
+                        group_bins.create_bins(arrQ.q_length,
                                            qmin=group.group_phil.reduction.q_range[0],
                                            qmax=group.group_phil.reduction.q_range[1],
                                            bins=group.group_phil.reduction.bins_number,
-                                           frame_mask=frame_mask)
+                                           frame_mask=frame_mask,
+                                               skip_empty=self.params.reduction.empty_bins_skip)
+                    except AttributeError:
+                        raise aares.RuntimeErrorUser('Q-space data expeceted, but do not exist. Please run aares.q-transformation.')
 
                     if group.group_phil.reduction.file_bin_masks is None:
                         group.group_phil.reduction.file_bin_masks = group.name + '.bins.h5a'
