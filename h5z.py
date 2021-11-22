@@ -432,6 +432,12 @@ class InstrumentFileH5(ABC):
         self._h5[key] = value
 
     @property
+    @abstractmethod
+    def transmitance(self):
+        '''Returns transmitance value for the data. Returns None, if not available'''
+        return None
+
+    @property
     def _h5(self):
         try:
             val = self.__h5
@@ -689,6 +695,16 @@ class SaxspointH5(InstrumentFileH5):
     @abs_path.setter
     def abs_path(self, val):
         self.attrs['abs_path'] = val
+
+    @property
+    def transmitance(self):
+        '''Returns transmitance value for the data. Returns None, if not available'''
+        try:
+            transmitance = float(self['entry/data/flux_exiting_sample'])/float(self['entry/data/flux_entering_sample'])
+        except KeyError:
+            transmitance = None
+
+        return transmitance
 
 def test_equal_Datasets():
     f1 = 'data/10x1s.h5'

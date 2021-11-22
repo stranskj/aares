@@ -67,6 +67,11 @@ reduction
         .help = Value, to which all the frames are scaled. If None, value from the first frame is chosen in such a way, that the scale of that frame is 1. (not implemented yet)
     }
     
+    transmitance = None
+    .type = bool
+    .expert_level = 0
+    .help = Normalize the data to transmitance, based on flux measurements. If None, applied if the flux data are available in the data.
+    
     file_bin_masks = None
     .type = path
     .help = File containing binning and reduction masks (output of previous aares.integrate).
@@ -284,6 +289,7 @@ def process_file(header, file_out, export=None,
                  bin_masks=None,
                  q_val=None,
                  scale=None,
+                 scale_transmitance=False,
                  nproc=None):
 
     aares.my_print(header.path)
@@ -295,6 +301,11 @@ def process_file(header, file_out, export=None,
         # avr = avr[:-1]
         # std = std[:-1]
         num = num[:-1]
+
+    if scale_transmitance:
+        transmitance = header.transmitance
+        averages /= transmitance
+        stddev /= transmitance
 
     aares.export.write_atsas(q_val, averages,stddev,
                              file_name=file_out,
@@ -328,6 +339,19 @@ def integrate_group(group, data_dictionary, job_control=None, output=None, expor
                                      'of:\nintegrate.beam_normalize.real_space\nintegrate'
                                      '.beam_normalize.q_range')
 
+    if params.reduction.transmitance is None:
+        if all([data_dictionary[fi.path].transmitance is not None for fi in group.scope_extract.file]):
+            aares.my_print('Transmitance data found, performing the scaling.')
+            scale_transmitance = True
+        else:
+            scale_transmitance = False
+            aares.my_print('Transmitance data not available')
+    else:
+        scale_transmitance = params.reduction.transmitance
+        if scale_transmitance:
+            if not all([data_dictionary[fi.path].transmitance is not None for fi in group.scope_extract.file]):
+                logging.warning('The data in the group does not contain information for transmitance scaling. Switchin the scaling off.')
+                scale_transmitance = False
   #  if not normalize_beam and params.mask.beamstop.semitransparent is not None: TODO: Check and think
   #      normalize_beam = True
   #      params.reduction.beam_normalize.real_space = [0, params.mask.beamstop.semitransparent]
@@ -370,7 +394,8 @@ def integrate_group(group, data_dictionary, job_control=None, output=None, expor
                               export=export,
                               bin_masks=bin_masks,
                               q_val=bin_masks_obj.q_axis,
-                              scale=params.reduction.beam_normalize.scale
+                              scale=params.reduction.beam_normalize.scale,
+                              scale_transmitance=scale_transmitance
                               )
 
     files = [data_dictionary[fi.path] for fi in group.scope_extract.file]
