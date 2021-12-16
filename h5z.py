@@ -553,7 +553,7 @@ class SaxspointH5(InstrumentFileH5):
         elif not os.path.isfile(path):
             raise OSError('File not found.')
         else:
-            raise TypeError
+            raise TypeError(f'Unknow file type: {path}')
 
     @staticmethod
     def is_type(val):
