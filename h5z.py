@@ -657,6 +657,17 @@ class SaxspointH5(InstrumentFileH5):
         """
         return self['entry/instrument/detector/time']
 
+    @time_offset.setter
+    def time_offset(self, val):
+        self['entry/instrument/detector/time'] = DatasetH5(source_dataset=val,name='time')
+        self['entry/instrument/detector/time'].attrs['axis'] = 3
+        self['entry/instrument/detector/time'].attrs['axis_location'] = 1
+        self['entry/instrument/detector/time'].attrs['primary'] = 1
+        self['entry/instrument/detector/time'].attrs['long_name'] = 'Time'
+        self['entry/instrument/detector/time'].attrs['units'] = 's'
+        self['entry/data/time'] = DatasetH5(source_dataset=val,name='time')
+        copy_attributes(self['entry/instrument/detector/time'], self['entry/data/time'])
+
     @property
     def file_time_iso(self):
         """
@@ -673,6 +684,13 @@ class SaxspointH5(InstrumentFileH5):
         :return: numpy.array
         """
         return self['entry/data/data']
+    @data.setter
+    def data(self, val):
+        dts = DatasetH5(source_dataset=val,name='data')
+        dts.attrs['long_name'] = 'Counts'
+        dts.attrs['signal'] = 1
+        dts.attrs['units'] = 's'
+        self['entry/data/data'] = dts
 
     @property
     def path(self):
