@@ -433,8 +433,13 @@ class DataFilesCarrier:
         files = get_files(phil_in.search_string, phil_in.suffix)
         aares.my_print('Found {} files. Reading headers...'.format(len(files)))
 
+        for fi in files:
+            if not h5z.is_h5_file(fi):
+                logging.warning(f'File is invalid or cannot be read, skipping: {fi}')
+                files.remove(fi)
+
         if len(files) == 0:
-            raise aares.RuntimeErrorUser('No files found.')
+            raise aares.RuntimeErrorUser('No usable files found.')
 
         self.files_dict = pwr.get_headers_dict(files, nproc=self.nproc)
         if phil_in.ignore_merged:
