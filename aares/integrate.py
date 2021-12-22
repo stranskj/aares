@@ -304,8 +304,8 @@ def process_file(header, file_out, export=None,
 
     if scale_transmitance:
         transmitance = header.transmitance
-        averages /= transmitance
-        stddev /= transmitance
+        averages *= transmitance
+        stddev *= transmitance
 
     aares.export.write_atsas(q_val, averages,stddev,
                              file_name=file_out,
