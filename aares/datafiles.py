@@ -164,18 +164,21 @@ def files_to_groups(files, headers_to_match='entry/instrument/detector', ignore_
     group_id = 1
 
     for fi, hd in files.items():
-        if is_merged(hd) and ignore_merged:
-            continue
+        try:
+            if is_merged(hd) and ignore_merged:
+                continue
 
-        file_scope = file_object(path=fi)
+            file_scope = file_object(path=fi)
 
-        for group in groups:
-            if all(hd[match] == files[group.file[0].path][match] for match in headers_to_match):
-                group.file.append(file_scope)
-                break
-        else:
-            groups.append(group_object([file_scope], name='group{:03d}'.format(group_id)))
-            group_id += 1
+            for group in groups:
+                if all(hd[match] == files[group.file[0].path][match] for match in headers_to_match):
+                    group.file.append(file_scope)
+                    break
+            else:
+                groups.append(group_object([file_scope], name='group{:03d}'.format(group_id)))
+                group_id += 1
+        except KeyError as e:
+            raise KeyError("Error while processing file: {}\n{}".format(fi, repr(e)))
 
     return groups
 
