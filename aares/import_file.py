@@ -61,6 +61,10 @@ prefix = None *time file_name
 .help = Prefix the file.name enumerated by... It also ensures uniqueness of the naming
 .type = choice
 
+force_headers = False
+.help = If "input_file" is provided, wheteher re-reading the headers should be enforced. Otherwise, only the new or modified datafiles are processed.
+.type = bool
+
 ignore_merged = True
 .help = 'Ignore files with merged frames. Using these diminish some of the AAres features. Moreover,'
         'no special handling fo these is implemented, which can lead to unexpected results.'
@@ -107,7 +111,14 @@ class JobImport(aares.Job):
             aares.my_print('\nReading headers of data files...')
             run = aares.datafiles.DataFilesCarrier(file_phil=file_scope, mainphil=self.system_phil)
 
-            run.read_headers() #Might be done for second time, is HDR-file originally exist...
+            if self.params.to_import.search_string is not None:
+                new_files = run.update(self.params.to_import.search_string,
+                           suffixes=self.params.to_import.suffix,
+                           ignore_merged=self.params.to_import.ignore_merged)
+                aares.my_print('Identified {} new or modified files.'.format(len(new_files)))
+
+            if len(run.files_dict) == 0:
+                run.read_headers() #Might be done for second time, is HDR-file originally exist...
             if self.params.to_import.headers is None:
                  self.params.to_import.headers = os.path.splitext(self.params.to_import.output)[0]+'.hdr'
             run.header_file = self.params.to_import.headers

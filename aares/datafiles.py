@@ -4,6 +4,7 @@ import itertools
 import math
 import os
 import logging
+import re
 
 import freephil as phil
 
@@ -65,6 +66,19 @@ group
 }
 ''')
 
+
+def validate_hdf5_files(files):
+    """
+    Checks, if the list of files are valid HDF5. Those, which are not are removed from the list.
+
+    :param files: List of file-paths to be checked
+    :type files: List of strings
+    """
+    assert isinstance(files,list)
+    for fi in files:
+        if not h5z.is_h5_file(fi):
+            logging.warning(f'File is invalid or cannot be read, skipping: {fi}')
+            files.remove(fi)
 
 def longest_common(list_strings, sep='_'):
     """
@@ -145,6 +159,12 @@ def get_files(inpaths, suffixes):
     return [os.path.normpath(fi) for fi in file_list]
 
 
+def match_headers(hd1, hd2, headers_to_match='entry/instrument/detector'):
+    if isinstance(headers_to_match, str):
+        headers_to_match = [headers_to_match]
+
+    return all(hd1[match] == hd2[match] for match in headers_to_match)
+
 def files_to_groups(files, headers_to_match='entry/instrument/detector', ignore_merged=True):
     """
     Split the files in the groups based on common headers.
@@ -171,7 +191,7 @@ def files_to_groups(files, headers_to_match='entry/instrument/detector', ignore_
             file_scope = file_object(path=fi)
 
             for group in groups:
-                if all(hd[match] == files[group.file[0].path][match] for match in headers_to_match):
+                if match_headers(hd, files[group.file[0].path], headers_to_match):
                     group.file.append(file_scope)
                     break
             else:
@@ -436,10 +456,7 @@ class DataFilesCarrier:
         files = get_files(phil_in.search_string, phil_in.suffix)
         aares.my_print('Found {} files. Reading headers...'.format(len(files)))
 
-        for fi in files:
-            if not h5z.is_h5_file(fi):
-                logging.warning(f'File is invalid or cannot be read, skipping: {fi}')
-                files.remove(fi)
+        validate_hdf5_files(files)
 
         if len(files) == 0:
             raise aares.RuntimeErrorUser('No usable files found.')
@@ -505,6 +522,47 @@ class DataFilesCarrier:
                 self.write_headers_to_file()
         else:
             self.read_headers()
+
+    def update(self,search_string, suffixes= ['h5z', 'h5'], ignore_merged=True):
+        '''
+        Updates list of files, and reads their headers, if they dont exist yet.
+
+        :return: Dictionary of the new files
+        '''
+        files = get_files(search_string, suffixes)
+        new_files = [fi for fi in files if fi not in self.files_dict.keys()]
+
+        validate_hdf5_files(new_files)
+
+        if len(new_files) == 0:
+            aares.my_print('No new or updated valid files identified.')
+            return {}
+
+        new_files_dict = pwr.get_headers_dict(new_files,nproc=self.nproc)
+
+        new_groups = files_to_groups(new_files_dict, h5z.SaxspointH5.geometry_fields,
+                                     ignore_merged=ignore_merged)
+
+        for group in new_groups:
+            for old_gr in self.file_scope.group:
+                if match_headers(new_files_dict[group.file[0].path],
+                                 self.files_dict[old_gr.file[0].path],
+                                 h5z.SaxspointH5.geometry_fields):
+                    old_gr.file.extend(group.file)
+                    break
+            else:
+                logging.warning('New geometry group introduced. Chechinkg the output files is highly advised, reprocessing might be needed.')
+                while group.name in [gr.name for gr in self.file_groups]:
+                    m = re.search(r'\d+$', group.name)
+                    i = int(m.group())+1 if m else 1
+                    group.name = group.name.split(m.group())[0]+'{:03d}'.format(i)
+                self.file_scope.group.append(group) # It might be needed to create FileGroup.
+
+        self.set_group_geometries()
+        self.files_dict.update(new_files_dict)
+
+        return new_files_dict
+
 
     def _is_file_key(self, key):
         """
