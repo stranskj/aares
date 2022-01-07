@@ -98,8 +98,11 @@ class JobImport(aares.Job):
             aares.my_print('Processing files based on content of file(s):')
             for fi in self.params.to_import.input_file:
                 aares.my_print('\t' + fi)
-            file_phils = [phil.parse(file_name=fi) for fi in self.params.to_import.input_file]
-            file_scope = aares.datafiles.phil_files.fetch(sources=file_phils)
+            try:
+                file_phils = [phil.parse(file_name=fi) for fi in self.params.to_import.input_file]
+                file_scope = aares.datafiles.phil_files.fetch(sources=file_phils)
+            except FileNotFoundError as e:
+                raise aares.RuntimeErrorUser(e)
 
             aares.my_print('\nReading headers of data files...')
             run = aares.datafiles.DataFilesCarrier(file_phil=file_scope, mainphil=self.system_phil)
