@@ -80,6 +80,19 @@ def validate_hdf5_files(files):
             logging.warning(f'File is invalid or cannot be read, skipping: {fi}')
             files.remove(fi)
 
+def validate_headers(file_dict):
+    '''
+    Check, if the file headers are usable. If not, removes from the dict.
+    :param file_dict: dictionary of the file headers
+    :type file_dict: FileHeadersDictionary
+    :return: The dictionary is modified in place
+    '''
+
+    for name in list(file_dict.keys()):
+        if not file_dict[name].validate():
+            logging.info(f'File was removed from processing as invalid: {name}')
+            file_dict.pop(name)
+
 def longest_common(list_strings, sep='_'):
     """
     Splits strings by `sep`, and return the common sections
@@ -462,6 +475,8 @@ class DataFilesCarrier:
             raise aares.RuntimeErrorUser('No usable files found.')
 
         self.files_dict = pwr.get_headers_dict(files, nproc=self.nproc)
+        validate_headers(self.files_dict)
+
         if phil_in.ignore_merged:
             i = 0
             for fi in list(self.files_dict.keys()):
@@ -516,11 +531,14 @@ class DataFilesCarrier:
  #       self.file_groups = self.file_scope.group
         if self.header_file is not None:
             if os.path.isfile(self.header_file):
+                logging.debug('Reading pre-extracted headers from: {}'.format(self.header_file))
                 self.read_headers_from_file()
             else:
+                logging.debug('File with pre-extracted headers ({}) does not exist, reading headers from data files...'.format(self.header_file))
                 self.read_headers()
                 self.write_headers_to_file()
         else:
+            logging.debug('No file with pre-read headers specified in input PHIL. Reading the headers...')
             self.read_headers()
 
     def update(self,search_string, suffixes= ['h5z', 'h5'], ignore_merged=True):
@@ -538,7 +556,10 @@ class DataFilesCarrier:
             aares.my_print('No new or updated valid files identified.')
             return {}
 
+        logging.debug('Reading headers of the new files...')
         new_files_dict = pwr.get_headers_dict(new_files,nproc=self.nproc)
+
+        validate_headers(new_files_dict)
 
         new_groups = files_to_groups(new_files_dict, h5z.SaxspointH5.geometry_fields,
                                      ignore_merged=ignore_merged)
@@ -559,9 +580,11 @@ class DataFilesCarrier:
                 self.file_scope.group.append(group) # It might be needed to create FileGroup.
 
         self.set_group_geometries()
-        self.files_dict.update(new_files_dict)
+        file_list = list(self.files(key='path'))
+        new_files_dict_out = {path: header for path, header in new_files_dict.items() if path in file_list}
+        self.files_dict.update(new_files_dict_out)
 
-        return new_files_dict
+        return new_files_dict_out
 
 
     def _is_file_key(self, key):
@@ -665,7 +688,7 @@ class DataFilesCarrier:
         if not self._is_file_key(key):
             raise AttributeError('This key type is not used: {}'.format(key))
 
-        for gr in self.file_groups:
+        for gr in self.file_scope.group:
             for fi in gr.file:
                 yield fi.__dict__[key]
 
@@ -674,6 +697,7 @@ class DataFilesCarrier:
         Reads the file headers, and fills the self.files_dict
         """
         self.files_dict = pwr.get_headers_dict(list(self.files('path')), nproc=self.nproc)
+        validate_headers(self.files_dict)
 
     def sort_by_time(self):
         """

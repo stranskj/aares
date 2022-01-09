@@ -579,6 +579,23 @@ class SaxspointH5(InstrumentFileH5):
 
         return out
 
+    def validate(self):
+        '''
+        Validates if the file is usable.
+        :return: bool
+        '''
+
+        try:
+            for itm in self.geometry_fields:
+                self[itm]
+        except KeyError:
+            logging.debug('File {}\ndoes not contain "{}"'.format(self.abs_path,itm))
+            return False
+        if len(self['entry/data']) == 0:
+            logging.debug('File {}\ndoes not contain any data.'.format(self.abs_path))
+            return False
+        return True
+
     def update_abs_path(self,abs_path = None):
         '''
         Updates abs_path entry. Based on "path", if intput is None

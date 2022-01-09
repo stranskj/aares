@@ -108,10 +108,11 @@ class JobImport(aares.Job):
             except FileNotFoundError as e:
                 raise aares.RuntimeErrorUser(e)
 
-            aares.my_print('\nReading headers of data files...')
+            aares.my_print('\nGetting headers extracted earlier...')
             run = aares.datafiles.DataFilesCarrier(file_phil=file_scope, mainphil=self.system_phil)
 
             if self.params.to_import.search_string is not None:
+                aares.my_print('Looking for new or modified files...')
                 new_files = run.update(self.params.to_import.search_string,
                            suffixes=self.params.to_import.suffix,
                            ignore_merged=self.params.to_import.ignore_merged)
