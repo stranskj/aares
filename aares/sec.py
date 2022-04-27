@@ -305,7 +305,7 @@ class JobSec(aares.Job):
                 elif aares.q_transformation.ArrayQ.is_type(param):
                     self.params.input.q_space = param
                 elif aares.integrate.ReductionBins.is_type(param):
-                    self.params.reduction.file_bins = param
+                    self.params.reduction.file_bin_masks = param
                 else:
                     raise aares.RuntimeErrorUser('Unknown type of H5 file: {}'.format(param))
             elif os.path.splitext(param)[1].lower() == '.png':
