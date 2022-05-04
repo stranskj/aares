@@ -232,11 +232,13 @@ def integrate(frame_arr, bin_masks):
     averages = []
     stdev = []
     num = []
-
+    num_not_masked = []
     for binm in bin_masks:
         #   int_mask = numpy.array([binm]*no_frame)
         binval = frame_arr[:, binm]
-        binval = binval[binval >= 0]  # TODO: performance hit needs checking
+        not_masked = binval<0
+        num_not_masked.append(numpy.sum(not_masked))
+ #       binval = binval[binval >= 0]  # TODO: performance hit needs checking; do we need it, e.g. isn't it masked? Maybe we could do it on whole file? Or warn, that there is an masking issue?
         if binval.size <= 0:
             averages.append(numpy.nan)
             stdev.append(numpy.nan)
@@ -254,7 +256,8 @@ def integrate(frame_arr, bin_masks):
     #    averages = map(numpy.average, [frame_arr]*len(bin_masks), int_masks)
     #    stdev = map(numpy.std,  [frame_arr] * len(bin_masks), int_masks)
 
-    return numpy.array(averages), numpy.array(stdev), numpy.array(num)
+    logging.debug('Number of unmasked pixels: {}'.format(numpy.sum(num_not_masked)))
+    return numpy.array(averages), numpy.array(stdev), numpy.array(num)#, numpy.sum(num_not_masked)
 
 
 def integrate_mp(frame_arr, bin_masks, nproc=None):
@@ -281,6 +284,8 @@ def integrate_mp(frame_arr, bin_masks, nproc=None):
         averages = res[0, :]
         stdev = res[1, :]
         num = res[2, :]
+
+  #      print('Number of unmasked pixels: {}'.format(numpy.sum(res[3, :])))
 
     return averages, stdev, num
 
