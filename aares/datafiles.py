@@ -300,6 +300,9 @@ class FileGroup():
         else:
             setattr(self._scope_extract,key,value)
 
+    def __deepcopy__(self, memodict={}):
+        new_copy = FileGroup(copy.deepcopy(self._main_phil), copy.deepcopy(self._scope_extract))
+        return new_copy
 
     @property
     def group_phil(self):
@@ -608,6 +611,15 @@ class DataFilesCarrier:
         file_list = list(self.files(key='path'))
         new_files_dict_out = {path: header for path, header in new_files_dict.items() if path in file_list}
         self.files_dict.update(new_files_dict_out)
+
+        # Set new names
+        self_copy = copy.deepcopy(self)
+        self_copy.set_name_from_filename()
+
+        for fi in new_files_dict_out.keys():
+            self_fi_sc = self.get_file_scope(fi, key='path')
+            copy_fi_sc = self_copy.get_file_scope(fi, key='path')
+            self_fi_sc.name = copy_fi_sc.name
 
         return new_files_dict_out
 
