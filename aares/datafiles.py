@@ -376,6 +376,24 @@ class FileGroup():
     def scope_extract(self, val):
         self._scope_extract = val
 
+class File_Groups(list):
+    pass
+    # def append(self, obj):
+    #     if not ((isinstance(obj, phil.scope_extract) or isinstance(obj,FileGroup))
+    #                             and hasattr(obj, 'file')):
+    #         raise AttributeError('Appended item probably is not group')
+    #
+    #     if isinstance(obj, phil.scope_extract):
+    #         new_obj = FileGroup(self.main_phil, obj)
+    #     else:
+    #         new_obj = obj
+    #
+    #     super().append(new_obj)
+    #
+    # def extend(self, __iterable):
+    #     for it in __iterable:
+    #         self.append(it)
+
 class DataFilesCarrier:
     """
     Handling class to control file imports
@@ -401,7 +419,7 @@ class DataFilesCarrier:
         self.main_phil = mainphil
         self._files_dict = FileHeadersDictionary()
         self.file_scope = phil_files.extract()
-        self.__file_groups = None
+       # self.__file_groups = File_Groups()
         #self.file_groups = None
         self.nproc = nproc
 
@@ -441,11 +459,11 @@ class DataFilesCarrier:
 
     @file_groups.setter
     def file_groups(self, item):
-        self.__file_groups = []
+        self.__file_groups = File_Groups()
         for val in item:
             self.__file_groups.append(FileGroup(self.main_phil, val))
 
-        self.file_scope.group = item
+        self.file_scope.group = self.__file_groups #item
 
     @property
     def header_file(self):
@@ -555,7 +573,7 @@ class DataFilesCarrier:
         if len(new_files) == 0:
             aares.my_print('No new or updated valid files identified.')
             return {}
-
+        logging.debug('Found {} new files to be considered.'.format(len(new_files)))
         logging.debug('Reading headers of the new files...')
         new_files_dict = pwr.get_headers_dict(new_files,nproc=self.nproc)
 
@@ -715,13 +733,14 @@ class DataFilesCarrier:
         :return:
         '''
 
-        if update:
-            self.file_scope.group = []
-            for group in self.file_groups:
-                self.file_scope.group.append(group.scope_extract)
+        # if update:
+        #     self.file_scope.group = []
+        #     for group in self.file_groups:
+        #         self.file_scope.group.append(group.scope_extract)
 
         try:
             group_out = self.file_scope
+
             with open(file_out, 'w') as fiout:
                 phil_files.format(group_out).show(out=fiout)
         except PermissionError:
