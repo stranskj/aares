@@ -416,9 +416,11 @@ class DataFilesCarrier:
         assert (run_phil is not None) ^ (file_phil is not None)
         assert isinstance(mainphil, phil.scope)
 
+        self.__header_file = None
         self.main_phil = mainphil
         self._files_dict = FileHeadersDictionary()
         self.file_scope = phil_files.extract()
+
        # self.__file_groups = File_Groups()
         #self.file_groups = None
         self.nproc = nproc
@@ -436,7 +438,12 @@ class DataFilesCarrier:
 
     @property
     def file_scope(self):
-        return self.__file_scope
+
+        out = self.__file_scope
+        out.group = []
+        for gr in self.file_groups:
+            out.group.append(gr.scope_extract)
+        return out
 
     @file_scope.setter
     def file_scope(self, val):
@@ -463,15 +470,15 @@ class DataFilesCarrier:
         for val in item:
             self.__file_groups.append(FileGroup(self.main_phil, val))
 
-        self.file_scope.group = self.__file_groups #item
+#        self.file_scope.group = self.__file_groups #item
 
     @property
     def header_file(self):
-        return self.file_scope.headers
+        return self.__file_scope.headers
 
     @header_file.setter
     def header_file(self, item):
-        self.file_scope.headers = item
+        self.__file_scope.headers = item
 
     def from_input_phil(self, phil_in):
         """
