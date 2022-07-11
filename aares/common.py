@@ -122,6 +122,18 @@ def search_files(indir, suffix):
                 fiout.append(os.path.join(root, file))
     return fiout
 
+def create_directory(dir, stop=False):
+    if not os.path.isdir(dir):
+        try:
+            os.mkdir(dir)
+            my_print('Created directory: {}'.format(dir))
+        except OSError:
+            raise RuntimeErrorUser('Path is not a directory: {}'.format(dir))
+    else:
+        logging.warning('Directory already exists: {}'.format(dir))
+        if stop:
+            raise RuntimeErrorUser('Directory already exists.')
+
 
 class Job(ABC):
     '''

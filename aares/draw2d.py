@@ -11,6 +11,8 @@ Draw frame
 @contact:    jan.stransky@ibt.cas.cz
 @deffield    updated: Updated
 """
+import concurrent.futures
+import logging
 
 import aares
 import sys,os
@@ -26,6 +28,8 @@ import PIL.Image
 import PIL.ImageOps
 import matplotlib.cm
 import h5z
+import aares.power as pwr
+
 
 phil_core = phil.parse("""
 input = None
@@ -97,7 +101,7 @@ def get_treasholds(frame, Imax= '2*median', Imin=0):
 
     return Imin, Imax
 
-def draw(frame, fiout, Imax= '2*median', Imin=0, cmap='jet'):
+def draw(frame, fiout, Imax= '2*median', Imin=0, cmap='jet', by_frame=False):
     '''
     Draws frame to a file
 
@@ -108,13 +112,43 @@ def draw(frame, fiout, Imax= '2*median', Imin=0, cmap='jet'):
     :return:
     '''
 
-    Imin, Imax = get_treasholds(frame, Imax, Imin)
+    try:
+        Imin = float(Imin)
+        Imax = float(Imax)
+    except ValueError:
+        aares.my_print('\nDetermining thresholds....')
+        mean = numpy.nanmean(frame, axis=0)
+        Imin, Imax = get_treasholds(mean, Imax, Imin)
 
     aares.my_print('''Used parameters:
     min: {min:.1f}
     max: {max:.1f}'''.format(min=Imin, max=Imax))
 
-    frame_to_png(frame, fiout, Imin, Imax, cmap)
+    if by_frame:
+        aares.my_print('\nFrames will drawn to individual files.')
+        folder_name = os.path.splitext(fiout)[0]
+        no_frame = numpy.size(frame, axis=0)
+        aares.my_print('Number of frames to be drawn: {}'.format(no_frame))
+        fi_names = [os.path.join(folder_name,'frame{:04d}.png'.format(i)) for i in range(1, no_frame+1)]
+
+        aares.create_directory(folder_name)
+
+        logging.debug('Current working path: {}'.format(os.getcwd()))
+        aares.my_print('Drawing frames to: {}'.format(folder_name))
+        logging.debug('Full output path: {}'.format(os.path.realpath(folder_name)))
+
+        with concurrent.futures.ProcessPoolExecutor() as ex:
+            pwr.mp_worker(ex.map, frame_to_png,
+                          frame,
+                          fi_names,
+                          [Imin]*no_frame,
+                          [Imax]*no_frame,
+                          [cmap]*no_frame
+                          )
+        pass
+
+    else:
+        frame_to_png(mean, fiout, Imin, Imax, cmap)
 
 def frame_to_png(frame, fiout, Imin=0, Imax=1, cmap='jet'):
     '''
@@ -167,8 +201,12 @@ class JobDraw2D(aares.Job):
         if not h5z.is_h5_file(self.params.input):
             raise aares.RuntimeErrorUser('Unsupported file type: {}'.format(self.params.input))
         header = h5z.SaxspointH5(self.params.input)
-        frame = numpy.nanmean(header.data[:], axis=0)
-        draw(frame, self.params.output,Imax=self.params.max,Imin=self.params.min, cmap=self.params.color_map)
+        #frame = numpy.nanmean(header.data[:], axis=0)
+        draw(header.data[:],
+             self.params.output,
+             Imax=self.params.max,Imin=self.params.min,
+             cmap=self.params.color_map,
+             by_frame=self.params.by_frame)
 
     def __set_system_phil__(self):
         '''
