@@ -36,6 +36,10 @@ frame = None
 .type = str
 .help = Frame or range of frames to be drawn. If None, an average of all frames is drawn
 
+by_frame = False
+.type = bool
+.help = Draws images of the individual frames. Value in "output" is converted to a folder name.
+
 min = 0
 .type = str
 .help = Minimum threshold for the color map. A number, string with multiple of 'min', 'max', 'median' or 'average'. For example: '3*median'
@@ -52,18 +56,15 @@ color_map = *jet hot
 .type = choice
 .help = Coloring scheme in the output
 
+
 """)
 
-
-def draw(frame, fiout, Imax= '2*median', Imin=0, cmap='jet'):
+def get_treasholds(frame, Imax= '2*median', Imin=0):
     '''
-    Draws frame to a file
+    Returns Imin and Imax to be used as a color range
 
-    :param frame:
-    :param fiout:
-    :param Imax:
-    :param Imin:
-    :return:
+    :param Imax, Imin: Range limits to be used, if some of them known. If string is provided, it has to be a number followed by '*' and one of keywords: min, max, median, average.
+    :type Imax, Imin: float or int or str
     '''
 
     threshold = [0,0]
@@ -94,21 +95,43 @@ def draw(frame, fiout, Imax= '2*median', Imin=0, cmap='jet'):
 
     Imin, Imax = sorted(threshold)
 
+    return Imin, Imax
+
+def draw(frame, fiout, Imax= '2*median', Imin=0, cmap='jet'):
+    '''
+    Draws frame to a file
+
+    :param frame:
+    :param fiout:
+    :param Imax:
+    :param Imin:
+    :return:
+    '''
+
+    Imin, Imax = get_treasholds(frame, Imax, Imin)
+
     aares.my_print('''Used parameters:
     min: {min:.1f}
     max: {max:.1f}'''.format(min=Imin, max=Imax))
+
+    frame_to_png(frame, fiout, Imin, Imax, cmap)
+
+def frame_to_png(frame, fiout, Imin=0, Imax=1, cmap='jet'):
+    '''
+    Draws 2-dimensional array to a image file.
+    '''
 
     normalized = (frame - Imin) / (Imax - Imin)
 
     normalized[normalized>1] = 1
     normalized[normalized < 0] = 0
 
-    imshow_kwargs = {
-        'vmax': threshold[1],
-        'vmin': threshold[0],
-        'cmap': 'RdYlBu',
-        'extent': (0, frame.shape[0], 0 , frame.shape[1]),
-    }
+    # imshow_kwargs = {
+    #     'vmax': threshold[1],
+    #     'vmin': threshold[0],
+    #     'cmap': 'RdYlBu',
+    #     'extent': (0, frame.shape[0], 0 , frame.shape[1]),
+    # }
 
 
     colormap = matplotlib.cm.get_cmap(cmap)
