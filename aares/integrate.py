@@ -387,11 +387,12 @@ def integrate_group(group, data_dictionary, job_control=None, output=None, expor
     else:
         bin_masks = bin_masks_obj.bin_masks
 
-    if not os.path.isdir(output.directory):
-        try:
-            os.mkdir(output.directory)
-        except OSError:
-            raise aares.RuntimeErrorUser('Path is not a directory: {}'.format(output.directory))
+    aares.create_directory(output.directory)
+    # if not os.path.isdir(output.directory):
+    #     try:
+    #         os.mkdir(output.directory)
+    #     except OSError:
+    #         raise aares.RuntimeErrorUser('Path is not a directory: {}'.format(output.directory))
 
     aares.my_print('Reducing files of {}:'.format(group.scope_extract.name))
     from functools import partial
