@@ -303,8 +303,11 @@ def process_file(header, file_out, frames=None, export=None,
     if frames is None:
         data = header.data
     else:
-        data = aares.slice_array(header.data, intervals=frames, axis=0)
-        logging.info('Only {} frames were used from: {}'.format(numpy.size(data, axis=0), header.path))
+        try:
+            data = aares.slice_array(header.data, intervals=frames, axis=0)
+            logging.info('Only {} frames were used from: {}'.format(numpy.size(data, axis=0), header.path))
+        except IndexError as err:
+            raise aares.RuntimeErrorUser(repr(err)+'\nError while processing file: {}\nCould not select specified frames. Note that frame indices are 0-based.'.format(header.path))
 
     averages, stddev, num = integrate_mp(data, bin_masks=bin_masks, nproc=nproc)
     if scale is not None:
