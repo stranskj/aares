@@ -290,15 +290,23 @@ def integrate_mp(frame_arr, bin_masks, nproc=None):
     return averages, stdev, num
 
 
-def process_file(header, file_out, export=None,
+def process_file(header, file_out, frames=None, export=None,
                  bin_masks=None,
                  q_val=None,
                  scale=None,
                  scale_transmitance=False,
+
                  nproc=None):
 
     aares.my_print(header.path)
-    averages, stddev, num = integrate_mp(header.data, bin_masks=bin_masks, nproc=nproc)
+
+    if frames is None:
+        data = header.data
+    else:
+        data = aares.slice_array(header.data, intervals=frames, axis=0)
+        logging.info('Only {} frames were used from: {}'.format(numpy.size(data, axis=0), header.path))
+
+    averages, stddev, num = integrate_mp(data, bin_masks=bin_masks, nproc=nproc)
     if scale is not None:
         frame_scale = scale / averages[-1]
         averages = averages[:-1] * frame_scale
@@ -407,9 +415,12 @@ def integrate_group(group, data_dictionary, job_control=None, output=None, expor
     files = [data_dictionary[fi.path] for fi in group.scope_extract.file]
     files_out = [os.path.join(output.directory, fi.name + '.dat')
                  for fi in group.scope_extract.file]  # TODO: use info from export or so
+
+    frames = [fi.frames for fi in group.scope_extract.file]
     aares.power.map_mp(process_partial,
                        files,
-                       files_out
+                       files_out,
+                       frames
                        )
 
 

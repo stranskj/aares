@@ -48,13 +48,18 @@ group_phil_str = '''
         name = None
         .type = str
         .help = String which is used as a reference for the file elsewhere. It has to be unique string.
+        
+        frames = None
+        .type = str
+        #.help = "Use only selected frames from the file. The frames are 0-indexed. The format is comma-separated list of frames or frame ranges, range boundaries are column-separated, left is inclusive, eight is exclusive. Valid examples: [1,2,3, 8,9] [:3, 6:9, 12:] [3,4, 8:12]"
     }
 '''
 group_phil = phil.parse(group_phil_str)
 phil_files = phil.parse('''
 headers = None
 .type = path
-.help = File storing parsed headers. If the file is not present, headers are read from the original data files.
+.help = "File storing parsed headers. If the file is not present, headers are read from the original"
+        "data files."
 
 group 
 .multiple = True

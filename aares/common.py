@@ -8,6 +8,7 @@ import logging.config
 from abc import ABC, abstractmethod
 
 import freephil as phil
+import numpy
 
 from aares.version import version
 
@@ -133,6 +134,44 @@ def create_directory(dir, stop=False):
         logging.warning('Directory already exists: {}'.format(dir))
         if stop:
             raise RuntimeErrorUser('Directory already exists.')
+
+def slice_array(arr, intervals='[:]', axis=None):
+    '''Slicing an array using parametric inputs (1D).
+
+    :param arr: Array to be processed
+    :type arr: numpy.array
+    :param intervals: string, which contains comma-separated intervals following typical array-slicing rules  ([i:j:k]). Example: '[1:3,6:8] will select items 1 to 3 and 6 to 8.
+    '''
+
+    list_intervals = intervals.strip('[] ').split(',')
+    indices = []
+    arr_len = numpy.size(arr, axis=axis)
+    for interval in list_intervals:
+        boundaries = interval.split(':')
+        if len(boundaries) == 3:
+            try:
+                step = int(boundaries[2])
+            except ValueError:
+                step = 1
+        else:
+            step = 1
+        try:
+            start = int(boundaries[0])
+        except ValueError:
+            start = 0
+
+        try:
+            stop = int(boundaries[1])
+        except ValueError:
+            stop = arr_len
+        except IndexError:
+            stop = start+1
+
+        if start >= arr_len or stop >= arr_len:
+            arr.take([start,stop],axis=0)
+
+        indices.extend(range(start, stop, step))
+    return arr.take(indices, axis=axis)
 
 
 class Job(ABC):
