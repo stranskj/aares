@@ -112,9 +112,11 @@ def draw(frame, fiout, Imax= '2*median', Imin=0, cmap='jet', by_frame=False):
     :return:
     '''
 
+    mean = None
     try:
         Imin = float(Imin)
         Imax = float(Imax)
+
     except ValueError:
         aares.my_print('\nDetermining thresholds....')
         mean = numpy.nanmean(frame, axis=0)
@@ -148,6 +150,8 @@ def draw(frame, fiout, Imax= '2*median', Imin=0, cmap='jet', by_frame=False):
         pass
 
     else:
+        if mean is None:
+            mean = numpy.nanmean(frame, axis=0)
         frame_to_png(mean, fiout, Imin, Imax, cmap)
 
 def frame_to_png(frame, fiout, Imin=0, Imax=1, cmap='jet'):
@@ -200,6 +204,7 @@ class JobDraw2D(aares.Job):
 
         if not h5z.is_h5_file(self.params.input):
             raise aares.RuntimeErrorUser('Unsupported file type: {}'.format(self.params.input))
+        aares.my_print('Reading file...')
         header = h5z.SaxspointH5(self.params.input)
         #frame = numpy.nanmean(header.data[:], axis=0)
         draw(header.data[:],
