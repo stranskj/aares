@@ -13,6 +13,7 @@ Merging multiple files
 """
 import copy
 
+import h5py
 import numpy
 
 import aares
@@ -52,13 +53,23 @@ def merge_files(in_files, out_file = 'merge.h5'):
     '''
 
     output_h5 = copy.deepcopy(in_files[0])
+    first = in_files[0]
     output_h5.path = out_file
-    data = numpy.concatenate([fi.data for fi in in_files])
+#    data = numpy.concatenate([fi.data for fi in in_files])
     time_offset = numpy.concatenate([fi.time_offset for fi in in_files])
-    output_h5.data = data
+ #   output_h5.data = data
     output_h5.time_offset = time_offset
+    output_h5.write(out_file)
 
-    return output_h5
+    with h5py.File(out_file, 'a') as fout:
+        data = fout.create_dataset('/entry/data/data',shape=(len(time_offset),*first.frame_size),dtype=first.data.dtype,compression='gzip')
+        i = 0
+        for fi in in_files:
+            logging.info('Writing {}'.format(fi.path))
+            no_frames = len(fi.time_offset)
+            data[i:i+no_frames] = fi.data
+            i += no_frames
+    #return output_h5
 
 class JobMerge(aares.Job):
     """
@@ -107,9 +118,9 @@ class JobMerge(aares.Job):
                 raise aares.RuntimeErrorUser('Geometries in the files are inconsistent.')
 
         aares.my_print('Merging files...')
-        merged_file = merge_files(list(data_files.files_dict.values()), self.params.output)
-        aares.my_print('Saving the megred file: {}'.format(self.params.output))
-        merged_file.write(self.params.output)
+        merge_files(list(data_files.files_dict.values()), self.params.output)
+        aares.my_print('Saved the megred file: {}'.format(self.params.output))
+#        merged_file.write(self.params.output)
 
 
     def __set_system_phil__(self):
