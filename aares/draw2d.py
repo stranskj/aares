@@ -60,6 +60,9 @@ color_map = *jet hot
 .type = choice
 .help = Coloring scheme in the output
 
+log_scale = False
+.type = bool
+.help = Put the data on logarithmic scale. Values of min and max are on the logscale too.
 
 """)
 
@@ -206,10 +209,24 @@ class JobDraw2D(aares.Job):
             raise aares.RuntimeErrorUser('Unsupported file type: {}'.format(self.params.input))
         aares.my_print('Reading file...')
         header = h5z.SaxspointH5(self.params.input)
-        #frame = numpy.nanmean(header.data[:], axis=0)
-        draw(header.data[:],
+        if self.params.log_scale:
+            frame = numpy.nanmean(header.data[:], axis=0)
+            aares.my_print('Putting data on a logarithmic scale...')
+            print(numpy.min(frame+1))
+            print(numpy.max(frame+1))
+            frame[frame<0]=0
+            print(numpy.min(frame))
+            frame_log = numpy.log(frame+1)
+            print(numpy.min(frame))
+            print(numpy.max(frame))
+            frame = frame_log.reshape((1,*frame_log.shape))
+            self.params.by_frame=False
+        else:
+            frame = header.data[:]
+
+        draw(frame,
              self.params.output,
-             Imax=self.params.max,Imin=self.params.min,
+             Imax=self.params.max, Imin=self.params.min,
              cmap=self.params.color_map,
              by_frame=self.params.by_frame)
 
