@@ -230,9 +230,14 @@ def integrate(frame_arr, bin_masks):
         bin_masks.shape = (1, *bin_masks.shape)
 
     averages = []
-    stdev = []
+    stdev_3d = []
     num = []
     num_not_masked = []
+    frame_mask = numpy.any(bin_masks,axis=0)
+    pixel_stdev = numpy.nanstd(frame_arr, axis=0, dtype='float64')
+    stdev_by_pixel = []
+    stdev_sqrtI = []
+
     for binm in bin_masks:
         #   int_mask = numpy.array([binm]*no_frame)
         binval = frame_arr[:, binm]
@@ -241,11 +246,14 @@ def integrate(frame_arr, bin_masks):
  #       binval = binval[binval >= 0]  # TODO: performance hit needs checking; do we need it, e.g. isn't it masked? Maybe we could do it on whole file? Or warn, that there is an masking issue?
         if binval.size <= 0:
             averages.append(numpy.nan)
-            stdev.append(numpy.nan)
+            stdev_3d.append(numpy.nan)
+            stdev_by_pixel.append(numpy.nan)
+            stdev_sqrtI.append(numpy.nan)
         else:
             averages.append(numpy.nanmean(binval, dtype='float64'))
-            stdev.append(numpy.nanstd(binval, dtype='float64') / math.sqrt(binval.size))
-        #  stdev.append(numpy.sqrt(averages[-1])/math.sqrt(binval.size))
+            stdev_3d.append(numpy.nanstd(binval, dtype='float64') / math.sqrt(binval.size))
+            stdev_by_pixel.append(numpy.nanmean(pixel_stdev[binm], dtype='float64')/math.sqrt(binval.size))
+            stdev_sqrtI.append(numpy.sqrt(averages[-1])/math.sqrt(binval.size))
         num.append(binval.size)
 
     # int_masks = [numpy.array([msk]*no_frame) for msk in bin_masks]
@@ -257,7 +265,7 @@ def integrate(frame_arr, bin_masks):
     #    stdev = map(numpy.std,  [frame_arr] * len(bin_masks), int_masks)
 
     logging.debug('Number of unmasked pixels: {}'.format(numpy.sum(num_not_masked)))
-    return numpy.array(averages), numpy.array(stdev), numpy.array(num)#, numpy.sum(num_not_masked)
+    return numpy.array(averages), numpy.array(stdev_3d), numpy.array(num)#, numpy.sum(num_not_masked)
 
 
 def integrate_mp(frame_arr, bin_masks, nproc=None):
