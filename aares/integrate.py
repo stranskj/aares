@@ -77,6 +77,13 @@ reduction
     .help = File containing binning and reduction masks (output of previous aares.integrate).
     .expert_level=1
     
+    error_model = *3d pixel poisson
+    .type = choice
+    .help = 'Model used to estimate measurement errors for intensity.'
+            ' 3d - Standard deviation of intensity at all pixels with given q (within g-bin).'
+            ' pixel - standard deviation at pixel across all frames followed by error propagation.'
+            ' poisson - standard deviation from Poisson distribution (e.g. square root of intensity).'
+    
     empty_skip = True
     .type = bool
     .help = If the bin contains zero pixels, it is ignored.
@@ -250,10 +257,12 @@ def integrate(frame_arr, bin_masks):
             stdev_by_pixel.append(numpy.nan)
             stdev_sqrtI.append(numpy.nan)
         else:
+
             averages.append(numpy.nanmean(binval, dtype='float64'))
             stdev_3d.append(numpy.nanstd(binval, dtype='float64') / math.sqrt(binval.size))
             stdev_by_pixel.append(numpy.nanmean(pixel_stdev[binm], dtype='float64')/math.sqrt(binval.size))
             stdev_sqrtI.append(numpy.sqrt(averages[-1])/math.sqrt(binval.size))
+
         num.append(binval.size)
 
     # int_masks = [numpy.array([msk]*no_frame) for msk in bin_masks]
@@ -265,7 +274,10 @@ def integrate(frame_arr, bin_masks):
     #    stdev = map(numpy.std,  [frame_arr] * len(bin_masks), int_masks)
 
     logging.debug('Number of unmasked pixels: {}'.format(numpy.sum(num_not_masked)))
-    return numpy.array(averages), numpy.array(stdev_3d), numpy.array(num)#, numpy.sum(num_not_masked)
+    errors = numpy.array([stdev_3d,
+                          stdev_by_pixel,
+                          stdev_sqrtI])
+    return numpy.array(averages), errors, numpy.array(num)#, numpy.sum(num_not_masked)
 
 
 def integrate_mp(frame_arr, bin_masks, nproc=None):
@@ -286,24 +298,24 @@ def integrate_mp(frame_arr, bin_masks, nproc=None):
         results = ex.map(integrate, [frame_arr] * nproc,
                          pwr.chunks(bin_masks, int(len(bin_masks) / nproc) + 1))
         # results = pwr.map_th(integrate, [frame_arr]*len(bin_masks), bin_masks, nchunks=nproc)
+        resl = list(results)
+      #  res = numpy.concatenate(resl, axis=1)
 
-        res = numpy.concatenate(list(results), axis=1)
-
-        averages = res[0, :]
-        stdev = res[1, :]
-        num = res[2, :]
+        averages = numpy.concatenate([res[0] for res in resl])
+        stdev = numpy.concatenate([res[1] for res in resl], axis=1)
+        num = numpy.concatenate([res[2] for res in resl])
 
   #      print('Number of unmasked pixels: {}'.format(numpy.sum(res[3, :])))
 
     return averages, stdev, num
 
 
-def process_file(header, file_out, frames=None, export=None,
+def process_file(header, file_out, frames=None, export=None, reduction = None,
                  bin_masks=None,
                  q_val=None,
                  scale=None,
                  scale_transmitance=False,
-
+                 error_model='3d',
                  nproc=None):
 
     aares.my_print(header.path)
@@ -331,12 +343,23 @@ def process_file(header, file_out, frames=None, export=None,
         averages *= transmitance
         stddev *= transmitance
 
+    error_model = reduction.error_model
+    #pick of stddev
+    if error_model == '3d':
+        stddev = stddev[0]
+    elif error_model == 'pixel':
+        stddev = stddev[1]
+    elif error_model == 'poisson':
+        stddev = stddev[2]
+    else:
+        raise aares.RuntimeErrorUser('Unknown error model: {}'.format(error_model))
+
     aares.export.write_atsas(q_val, averages,stddev,
                              file_name=file_out,
                              header=['# {}\n'.format(header.path)])
 
 
-def integrate_group(group, data_dictionary, job_control=None, output=None, export=None):
+def integrate_group(group, data_dictionary, job_control=None, output=None, export=None, reduction=None):
     '''
     Integrates group of files
 
@@ -405,6 +428,7 @@ def integrate_group(group, data_dictionary, job_control=None, output=None, expor
             aares.my_print('Normalization scale set to: {:.3f}'.format(scale[0]))
     else:
         bin_masks = bin_masks_obj.bin_masks
+    aares.my_print('Using error model: {}\n'.format(reduction.error_model))
 
     aares.create_directory(output.directory)
     # if not os.path.isdir(output.directory):
@@ -420,7 +444,8 @@ def integrate_group(group, data_dictionary, job_control=None, output=None, expor
                               bin_masks=bin_masks,
                               q_val=bin_masks_obj.q_axis,
                               scale=params.reduction.beam_normalize.scale,
-                              scale_transmitance=scale_transmitance
+                              scale_transmitance=scale_transmitance,
+                              reduction=reduction
                               )
 
     files = [data_dictionary[fi.path] for fi in group.scope_extract.file]
@@ -785,12 +810,14 @@ class JobReduction(aares.Job):
             raise aares.RuntimeWarningUser(
                 'Not implemented yet, please use aares.import -> aares.q_transformation')
 
+      #  aares.my_print('Using error model: {}\n'.format(self.params.reduction.error_model))
         for group in imported_files.file_groups:
             aares.my_print('Reducing files in group {}:'.format(group.name))
 
             integrate_group(group, imported_files.files_dict,
                             job_control=None,
                             export=self.params.export,
+                            reduction=self.params.reduction,
                             output=self.params.output)  # TODO: prepare job_control
 
     # def __worker__(self):
