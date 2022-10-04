@@ -110,7 +110,9 @@ class JobImport(aares.Job):
 
             aares.my_print('\nGetting headers extracted earlier...')
             run = aares.datafiles.DataFilesCarrier(file_phil=file_scope, mainphil=self.system_phil)
-
+            if self.params.to_import.force_headers:
+                aares.my_print('\nRe-reading the file headers...')
+                run.read_headers()
             if self.params.to_import.search_string is not None:
                 aares.my_print('Looking for new or modified files...')
                 new_files = run.update(self.params.to_import.search_string,
