@@ -87,6 +87,7 @@ reduction
     empty_skip = True
     .type = bool
     .help = If the bin contains zero pixels, it is ignored.
+
 }     
 '''
 
