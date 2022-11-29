@@ -573,7 +573,8 @@ class SaxspointH5(InstrumentFileH5):
             if 'saxsdrive' in attributes['creator'].decode().lower():
                 out = True
             else:
-                out = False
+                logging.warning('Proper name of the file creator is missing in the header.')
+                out = True
         except KeyError:
             out = False
 
