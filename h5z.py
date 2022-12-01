@@ -438,6 +438,12 @@ class InstrumentFileH5(ABC):
         return None
 
     @property
+    @abstractmethod
+    def transmitance(self):
+        '''Returns sample name. Returns None, if not available'''
+        return None
+
+    @property
     def _h5(self):
         try:
             val = self.__h5
@@ -553,7 +559,7 @@ class SaxspointH5(InstrumentFileH5):
         elif not os.path.isfile(path):
             raise OSError('File not found.')
         else:
-            raise TypeError(f'Unknow file type: {path}')
+            raise TypeError(f'Unknown file type: {path}')
 
     @staticmethod
     def is_type(val):
@@ -614,7 +620,11 @@ class SaxspointH5(InstrumentFileH5):
 
     @property
     def sample_name(self):
-        return ''.join([chr(i) for i in self['entry/data/sample_name'][0] if i > 0])
+        try:
+            sample_name = ''.join([chr(i) for i in self['entry/sample/sample_name'][0] if i > 0])
+        except KeyError:
+            sample_name = None
+        return sample_name
 
     @property
     def pixel_size(self):
@@ -777,6 +787,12 @@ def test_DatasetH5():
     dts = DatasetH5(a)
     print(dts)
 
+def test_SaxspointH5_name():
+    finame = '../data/named_LVA_3.01/lys_RC3/Temperature_293.2K/SDD_570mm/lys_RC3_Temperature_293.2K_SDD_570mm_010Frames.h5z'
+    fh5 = SaxspointH5(finame)
+    sample_name = fh5.sample_name
+    assert sample_name == 'buffer'
+    pass
 
 if __name__ == "__main__":
     test_equal_Datasets()

@@ -529,6 +529,10 @@ class DataFilesCarrier:
         self.header_file = phil_in.headers
 
         self.set_group_geometries()
+
+        self.set_name(phil_in)
+
+    def set_name(self, phil_in, sep='_'):
         if phil_in.prefix == 'time':
             self.sort_by_time()
             prefix = True
@@ -536,7 +540,22 @@ class DataFilesCarrier:
             prefix = True
         else:
             prefix = False
-        self.set_name_from_filename(strip_common=phil_in.shorten, prefix=prefix)
+
+        if phil_in.name_from == "file_name":
+            self.set_name_from_filename(strip_common=phil_in.shorten,  sep= sep)
+        elif phil_in.name_from == "sample":
+            self.set_name_from_sample()
+        else:
+            raise aares.RuntimeErrorUser('Not sure, what to do. Please set "name_from".')
+
+        if prefix:
+
+            i = 1
+            digit = int(math.log10(len(self.files_dict))) + 1
+            for fi in self.files_dict.keys():
+                scope = self.get_file_scope(fi, key='path')
+                scope.name = sep.join([str(i).zfill(digit), scope.name])
+                i += 1
 
     def from_phil_file(self, phil_in):
         """
@@ -650,7 +669,20 @@ class DataFilesCarrier:
         for group in self.file_groups:
             group.geometry = group.file[0].path
 
-    def set_name_from_filename(self, strip_common=True, prefix = True, sep='_'):
+    def set_name_from_sample(self, no_sample='Unknown'):
+        """
+        Set group.file.name based on the sample name
+        """
+
+        for fi, hdr in self.files_dict.items():
+            scope = self.get_file_scope(fi, key='path')
+            scope.name = hdr.sample_name
+            if scope.name is None:
+                logging.warning('File does not have sample name set: {}'.format(fi))
+                scope.name = no_sample
+
+
+    def set_name_from_filename(self, strip_common=True, sep='_'):
         """
         Set group.file.name based on the file name
 
@@ -682,14 +714,6 @@ class DataFilesCarrier:
                         for cmn in common:
                             name.remove(cmn)
                         fi.name = sep.join(name)
-
-        if prefix:
-            i = 1
-            digit = int(math.log10(len(self.files_dict))) + 1
-            for fi in self.files_dict.keys():
-                scope = self.get_file_scope(fi, key='path')
-                scope.name = sep.join([str(i).zfill(digit), scope.name])
-                i += 1
 
     def get_file_scope(self, value, key='name'):
         """
