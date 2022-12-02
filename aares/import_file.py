@@ -62,7 +62,7 @@ prefix = None *time file_name
 .type = choice
 
 force_headers = False
-.help = If "input_file" is provided, wheteher re-reading the headers should be enforced. Otherwise, only the new or modified datafiles are processed.
+.help = If "input_file" is provided, whether re-reading the headers should be enforced. Otherwise, only the new or modified datafiles are processed.
 .type = bool
 
 ignore_merged = True
