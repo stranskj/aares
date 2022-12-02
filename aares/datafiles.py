@@ -595,7 +595,7 @@ class DataFilesCarrier:
 
     def update(self,search_string, suffixes= ['h5z', 'h5'], ignore_merged=True):
         '''
-        Updates list of files, and reads their headers, if they dont exist yet.
+        Updates list of files, and reads their headers, if they don't exist yet.
 
         :return: Dictionary of the new files
         '''
@@ -638,7 +638,7 @@ class DataFilesCarrier:
 
         # Set new names
         self_copy = copy.deepcopy(self)
-        self_copy.set_name_from_filename()
+        self_copy.set_name()
 
         for fi in new_files_dict_out.keys():
             self_fi_sc = self.get_file_scope(fi, key='path')
