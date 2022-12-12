@@ -446,7 +446,8 @@ def integrate_group(group, data_dictionary, job_control=None, output=None, expor
                               q_val=bin_masks_obj.q_axis,
                               scale=params.reduction.beam_normalize.scale,
                               scale_transmitance=scale_transmitance,
-                              reduction=reduction
+                              reduction=reduction,
+                              nproc=job_control.threads
                               )
 
     files = [data_dictionary[fi.path] for fi in group.scope_extract.file]
@@ -457,7 +458,8 @@ def integrate_group(group, data_dictionary, job_control=None, output=None, expor
     aares.power.map_mp(process_partial,
                        files,
                        files_out,
-                       frames
+                       frames,
+                       nchunks=job_control.jobs
                        )
 
 
