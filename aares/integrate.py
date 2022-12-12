@@ -262,7 +262,7 @@ def integrate(frame_arr, bin_masks):
             averages.append(numpy.nanmean(binval, dtype='float64'))
             stdev_3d.append(numpy.nanstd(binval, dtype='float64') / math.sqrt(binval.size))
             stdev_by_pixel.append(numpy.nanmean(pixel_stdev[binm], dtype='float64')/math.sqrt(binval.size))
-            stdev_sqrtI.append(numpy.sqrt(averages[-1])/math.sqrt(binval.size))
+            stdev_sqrtI.append(numpy.sqrt(numpy.abs(averages[-1]))/math.sqrt(binval.size))
 
         num.append(binval.size)
 
@@ -374,6 +374,7 @@ def integrate_group(group, data_dictionary, job_control=None, output=None, expor
     if job_control is None:
         job_control = pwr.phil_job_control.extract().job_control
         job_control.threads, job_control.jobs = pwr.get_cpu_distribution(job_control)
+        aares.my_print('Using {} threads per {} jobs.'.format(job_control.threads, job_control.jobs))
 
     params = group.group_phil
 
