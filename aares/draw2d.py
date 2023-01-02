@@ -29,6 +29,7 @@ import PIL.ImageOps
 import matplotlib.cm
 import h5z
 import aares.power as pwr
+import aares.datafiles
 
 
 phil_core = phil.parse("""
@@ -104,6 +105,35 @@ def get_treasholds(frame, Imax= '2*median', Imin=0):
 
     return Imin, Imax
 
+
+def draw_file(file_in, output=None, params=None):
+    if output is None:
+        output = params.output
+
+    if not h5z.is_h5_file(file_in):
+        raise aares.RuntimeErrorUser('Unsupported file type: {}'.format(file_in))
+    aares.my_print('Reading file...')
+    header = h5z.SaxspointH5(file_in)
+    if params.log_scale:
+        frame = numpy.nanmean(header.data[:], axis=0)
+        aares.my_print('Putting data on a logarithmic scale...')
+        print(numpy.min(frame + 1))
+        print(numpy.max(frame + 1))
+        frame[frame < 0] = 0
+        print(numpy.min(frame))
+        frame_log = numpy.log(frame + 1)
+        print(numpy.min(frame))
+        print(numpy.max(frame))
+        frame = frame_log.reshape((1, *frame_log.shape))
+        params.by_frame = False
+    else:
+        frame = header.data[:]
+
+    draw(frame,
+         output,
+         Imax=params.max, Imin=params.min,
+         cmap=params.color_map,
+         by_frame=params.by_frame)
 def draw(frame, fiout, Imax= '2*median', Imin=0, cmap='jet', by_frame=False):
     '''
     Draws frame to a file
@@ -205,30 +235,21 @@ class JobDraw2D(aares.Job):
         :return:
         '''
 
-        if not h5z.is_h5_file(self.params.input):
-            raise aares.RuntimeErrorUser('Unsupported file type: {}'.format(self.params.input))
-        aares.my_print('Reading file...')
-        header = h5z.SaxspointH5(self.params.input)
-        if self.params.log_scale:
-            frame = numpy.nanmean(header.data[:], axis=0)
-            aares.my_print('Putting data on a logarithmic scale...')
-            print(numpy.min(frame+1))
-            print(numpy.max(frame+1))
-            frame[frame<0]=0
-            print(numpy.min(frame))
-            frame_log = numpy.log(frame+1)
-            print(numpy.min(frame))
-            print(numpy.max(frame))
-            frame = frame_log.reshape((1,*frame_log.shape))
-            self.params.by_frame=False
+        if h5z.is_h5_file(self.params.input):
+            draw_file(self.params.input,self.params.output,self.params)
+        elif aares.datafiles.is_fls(self.params.input):
+            fls = aares.datafiles.DataFilesCarrier(file_phil=self.params.input,mainphil=self.system_phil)
+            out_dir = os.path.splitext(self.params.output)[0]
+            aares.create_directory(out_dir)
+            for name in fls.files(key='name'):
+                fi_path = fls.get_file_scope(name).path
+                aares.my_print('\nDrawing: {}'.format(name))
+                draw_file(fi_path,
+                          output=os.path.join(out_dir,name+'.png'),
+                          params=self.params)
         else:
-            frame = header.data[:]
+            raise aares.RuntimeErrorUser('Unsupported file type: {}'.format(self.params.input))
 
-        draw(frame,
-             self.params.output,
-             Imax=self.params.max, Imin=self.params.min,
-             cmap=self.params.color_map,
-             by_frame=self.params.by_frame)
 
     def __set_system_phil__(self):
         '''
