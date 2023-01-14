@@ -334,7 +334,7 @@ def process_file(header, file_out, frames=None, export=None, reduction = None,
     if scale is not None:
         frame_scale = scale / averages[-1]
         averages = averages[:-1] * frame_scale
-        stddev = stddev[:-1] * abs(frame_scale)
+        stddev = stddev[:,:-1] * abs(frame_scale)
         # avr = avr[:-1]
         # std = std[:-1]
         num = num[:-1]
