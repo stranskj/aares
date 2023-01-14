@@ -11,6 +11,7 @@ import freephil as phil
 import aares
 import h5z
 from aares import power as pwr
+#from aares.import_file import phil_core as import_phil
 
 group_phil_str = '''
     name = None
@@ -532,7 +533,10 @@ class DataFilesCarrier:
 
         self.set_name(phil_in)
 
-    def set_name(self, phil_in, sep='_'):
+    def set_name(self, phil_in,
+                 sep='_'):
+        if phil_in is None:
+            phil_in = self.main_phil.extract().to_import
         if phil_in.prefix == 'time':
             self.sort_by_time()
             prefix = True
@@ -593,7 +597,7 @@ class DataFilesCarrier:
             logging.debug('No file with pre-read headers specified in input PHIL. Reading the headers...')
             self.read_headers()
 
-    def update(self,search_string, suffixes= ['h5z', 'h5'], ignore_merged=True):
+    def update(self,search_string, run_phil=None, suffixes= ['h5z', 'h5'], ignore_merged=True):
         '''
         Updates list of files, and reads their headers, if they don't exist yet.
 
@@ -638,7 +642,7 @@ class DataFilesCarrier:
 
         # Set new names
         self_copy = copy.deepcopy(self)
-        self_copy.set_name()
+        self_copy.set_name(run_phil)
 
         for fi in new_files_dict_out.keys():
             self_fi_sc = self.get_file_scope(fi, key='path')

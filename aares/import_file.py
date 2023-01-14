@@ -116,6 +116,7 @@ class JobImport(aares.Job):
             if self.params.to_import.search_string is not None:
                 aares.my_print('Looking for new or modified files...')
                 new_files = run.update(self.params.to_import.search_string,
+                                       run_phil = self.params.to_import,
                            suffixes=self.params.to_import.suffix,
                            ignore_merged=self.params.to_import.ignore_merged)
                 aares.my_print('Identified {} new or modified files.'.format(len(new_files)))
