@@ -104,11 +104,11 @@ def integrate_file(header, q_masks, q_bins, start_frame=1, prefix='frame', numdi
             if scale is not None:
                 frame_scale = scale / avr[-1]
                 avr = avr[:-1] * frame_scale
-                std = std[:-1] * abs(frame_scale)
+                std = std[:,:-1] * abs(frame_scale)
                 # avr = avr[:-1]
                 # std = std[:-1]
                 num = num[:-1]
-            aares.export.write_atsas(q_bins, avr, std,
+            aares.export.write_atsas(q_bins, avr, std[1], #TODO: pick error model
                                      file_name=prefix + str(start_frame).zfill(numdigit) + '.dat',
                                      header=['# {} {}'.format(header.path,
                                                               str(start_frame).zfill(numdigit))])
