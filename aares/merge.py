@@ -62,7 +62,9 @@ def merge_files(in_files, out_file = 'merge.h5'):
     output_h5.write(out_file)
 
     with h5py.File(out_file, 'a') as fout:
-        data = fout.create_dataset('/entry/data/data',shape=(len(time_offset),*first.frame_size),dtype=first.data.dtype,compression='gzip')
+        data = fout.create_dataset('/entry/data/data',shape=(len(time_offset),*first.frame_size),dtype=first.data.dtype,
+                                   compression='gzip'
+                                   )
         i = 0
         for fi in in_files:
             logging.info('Writing {}'.format(fi.path))

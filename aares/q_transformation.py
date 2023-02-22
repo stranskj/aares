@@ -17,9 +17,27 @@ units = *nm A
 .type = choice
 .help = 'Units to be used. The length of scattering vector (:math:`q`) is calculated as :math:`4\pi*sin \\theta/\lambda` in inverse units of choice.'
 
-origin = None
-.type = ints(2)
-.help = Beam position at the detector in pixels (Not implemented yet)
+geometry {
+    beam_center_px = None
+    .type = ints(2)
+    .help = Beam position at the detector in pixels (Not implemented yet)
+
+    sdd = None
+    .type = float
+    .help = Sample to detector distance in meters
+    
+    meridional_angle = None
+    .type = float
+    .help = Meridional angle in radians
+    
+    pixel_size = None
+    .type = floats(2)
+    .help = Pixel size (X,Y) in meters
+    
+    wavelength = None
+    .type = float
+    .help = Wavelength in meters 
+}    
 
 file = None
 .type = path

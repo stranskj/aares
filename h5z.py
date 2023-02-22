@@ -128,7 +128,7 @@ def recompress(path1, path2, log=False, compression='gzip'):
     :returns: A tuple(original_size, new_size)
     """
     with h5py.File(path1, "r") as in_file, h5py.File(path2, "w") as out_file:
-        walk(in_file, out_file, log=log, compression=compression)
+        walk_compress(in_file, out_file, log=log, compression=compression)
     return os.stat(path1).st_size, os.stat(path2).st_size
 
 def groupH5_to_scope(group):
@@ -444,6 +444,80 @@ class InstrumentFileH5(ABC):
         return None
 
     @property
+    @abstractmethod
+    def sdd(self):
+        '''
+        Returns sample to detector distance
+        '''
+        return None
+    @sdd.setter
+    @abstractmethod
+    def sdd(self, val):
+        '''
+        Replaces sample to detector distance
+        '''
+        pass
+
+    @property
+    @abstractmethod
+    def meridional_angle(self):
+        '''
+        Returns sample to meridional angle
+        '''
+        return None
+    @meridional_angle.setter
+    @abstractmethod
+    def meridional_angle(self, val):
+        '''
+        Replaces sample to detector distance
+        '''
+        pass
+
+    @property
+    @abstractmethod
+    def pixel_size(self):
+        '''
+        Returns sample to detector pixel size
+        '''
+        return None
+    @pixel_size.setter
+    @abstractmethod
+    def pixel_size(self, val):
+        '''
+        Replaces sample to detector pixel size
+        '''
+        pass
+
+    @property
+    @abstractmethod
+    def wavelength(self):
+        '''
+        Returns sample X-ray wavelength
+        '''
+        return None
+    @wavelength.setter
+    @abstractmethod
+    def wavelength(self, val):
+        '''
+        Replaces sample X-ray wavelength
+        '''
+        pass
+
+    @property
+    @abstractmethod
+    def beam_center_px(self):
+        '''
+        Returns postition of beam on the detector in pixels
+        '''
+        return None
+    @beam_center_px.setter
+    @abstractmethod
+    def beam_center_px(self, val):
+        '''
+        Replaces postition of beam on the detector in pixels
+        '''
+        pass
+    @property
     def _h5(self):
         try:
             val = self.__h5
@@ -511,6 +585,9 @@ class SaxspointH5(InstrumentFileH5):
 
     :ivar geometry_fields: List of fields, which describe the experiment geometry
     """
+
+
+
     skip_entries = ['entry/data/data',
                         'entry/data/x_pixel_offset',
                         'entry/data/y_pixel_offset',
@@ -635,6 +712,15 @@ class SaxspointH5(InstrumentFileH5):
         pixel_size_y = self['entry/instrument/detector/y_pixel_size'].item()
         return pixel_size_x, pixel_size_y
 
+    @pixel_size.setter
+    def pixel_size(self,val):
+        """
+        Set pixel size of the detector in meters
+        """
+        assert len(val) == 2
+        self['entry/instrument/detector/x_pixel_size'][0] = val[0]
+        self['entry/instrument/detector/y_pixel_size'][1] = val[1]
+
     @property
     def detector_offset(self):
         """
@@ -657,6 +743,21 @@ class SaxspointH5(InstrumentFileH5):
         y = -det[1] / pix[1]
 
         return x, y
+
+    @beam_center_px.setter
+    def beam_center_px(self, val):
+        raise NotImplementedError
+
+    @property
+    def meridional_angle(self):
+        '''Meridional angle'''
+        return self['entry/instrument/detector/meridional_angle'].item()
+
+    @meridional_angle.setter
+    def meridional_angle(self, val):
+        '''Meridional angle'''
+        self['entry/instrument/detector/meridional_angle'][0] = val
+
     @property
     def frame_size(self):
         '''
@@ -671,12 +772,26 @@ class SaxspointH5(InstrumentFileH5):
         """
         return self['entry/instrument/detector/distance'].item()
 
+    @sdd.setter
+    def sdd(self,val):
+        '''
+        Set sample to detector distance
+        '''
+        self['entry/instrument/detector/distance'][0] = float(val)
+
     @property
     def wavelength(self):
         """
         X-ray wavelength
         """
         return self['entry/instrument/monochromator/wavelength'].item()
+
+    @wavelength.setter
+    def wavelength(self, val):
+        """
+        Set X-ray wavelength
+        """
+        self['entry/instrument/monochromator/wavelength'][0] = float(val)
 
     @property
     def time_offset(self):
