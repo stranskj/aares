@@ -376,7 +376,7 @@ def integrate_group(group, data_dictionary, job_control=None, output=None, expor
     if job_control is None:
         job_control = pwr.phil_job_control.extract().job_control
         job_control.threads, job_control.jobs = pwr.get_cpu_distribution(job_control)
-        aares.my_print('Using {} threads per {} jobs.'.format(job_control.threads, job_control.jobs))
+    aares.my_print('Using {} threads per {} jobs.'.format(job_control.threads, job_control.jobs))
 
     params = group.group_phil
 
@@ -821,7 +821,7 @@ class JobReduction(aares.Job):
             aares.my_print('Reducing files in group {}:'.format(group.name))
 
             integrate_group(group, imported_files.files_dict,
-                            job_control=None,
+                            job_control=self.params.job_control,
                             export=self.params.export,
                             reduction=self.params.reduction,
                             output=self.params.output)  # TODO: prepare job_control
