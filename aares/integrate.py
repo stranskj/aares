@@ -77,7 +77,8 @@ reduction
     .help = File containing binning and reduction masks (output of previous aares.integrate).
     .expert_level=1
     
-    error_model = *3d pixel poisson
+    #error_model = *3d poisson pixel
+    error_model = *3d poisson 
     .type = choice
     .help = 'Model used to estimate measurement errors for intensity.'
             ' 3d - Standard deviation of intensity at all pixels with given q (within g-bin).'
@@ -241,9 +242,9 @@ def integrate(frame_arr, bin_masks):
     stdev_3d = []
     num = []
     num_not_masked = []
-    frame_mask = numpy.any(bin_masks,axis=0)
-    pixel_stdev = numpy.nanstd(frame_arr, axis=0, dtype='float64')
-    stdev_by_pixel = []
+    #frame_mask = numpy.any(bin_masks,axis=0)
+#    pixel_stdev = numpy.nanstd(frame_arr, axis=0, dtype='float64')
+#    stdev_by_pixel = []
     stdev_sqrtI = []
 
     for binm in bin_masks:
@@ -255,13 +256,13 @@ def integrate(frame_arr, bin_masks):
         if binval.size <= 0:
             averages.append(numpy.nan)
             stdev_3d.append(numpy.nan)
-            stdev_by_pixel.append(numpy.nan)
+    #        stdev_by_pixel.append(numpy.nan)
             stdev_sqrtI.append(numpy.nan)
         else:
 
             averages.append(numpy.nanmean(binval, dtype='float64'))
             stdev_3d.append(numpy.nanstd(binval, dtype='float64') / math.sqrt(binval.size))
-            stdev_by_pixel.append(numpy.nanmean(pixel_stdev[binm], dtype='float64')/math.sqrt(binval.size))
+     #       stdev_by_pixel.append(numpy.nanmean(pixel_stdev[binm], dtype='float64')/math.sqrt(binval.size))
             stdev_sqrtI.append(numpy.sqrt(numpy.abs(averages[-1]))/math.sqrt(binval.size))
 
         num.append(binval.size)
@@ -276,8 +277,9 @@ def integrate(frame_arr, bin_masks):
 
     logging.debug('Number of unmasked pixels: {}'.format(numpy.sum(num_not_masked)))
     errors = numpy.array([stdev_3d,
-                          stdev_by_pixel,
-                          stdev_sqrtI])
+                          stdev_sqrtI,
+                          # stdev_by_pixel,
+                         ])
     return numpy.array(averages), errors, numpy.array(num)#, numpy.sum(num_not_masked)
 
 
@@ -349,9 +351,9 @@ def process_file(header, file_out, frames=None, export=None, reduction = None,
     if error_model == '3d':
         stddev = stddev[0]
     elif error_model == 'pixel':
-        stddev = stddev[1]
-    elif error_model == 'poisson':
         stddev = stddev[2]
+    elif error_model == 'poisson':
+        stddev = stddev[1]
     else:
         raise aares.RuntimeErrorUser('Unknown error model: {}'.format(error_model))
 
