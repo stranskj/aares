@@ -13,6 +13,7 @@ Draw frame
 """
 import concurrent.futures
 import logging
+import multiprocessing
 
 import aares
 import sys,os
@@ -64,6 +65,10 @@ color_map = *jet hot
 log_scale = False
 .type = bool
 .help = Put the data on logarithmic scale. Values of min and max are on the logscale too.
+
+nproc = 0
+.type = int
+.help = Number of processes  to be used. When 0, set to number of CPU cores.
 
 """)
 
@@ -241,12 +246,28 @@ class JobDraw2D(aares.Job):
             fls = aares.datafiles.DataFilesCarrier(file_phil=self.params.input,mainphil=self.system_phil)
             out_dir = os.path.splitext(self.params.output)[0]
             aares.create_directory(out_dir)
-            for name in fls.files(key='name'):
-                fi_path = fls.get_file_scope(name).path
-                aares.my_print('\nDrawing: {}'.format(name))
-                draw_file(fi_path,
-                          output=os.path.join(out_dir,name+'.png'),
-                          params=self.params)
+            if self.params.nproc == 0:
+                self.params.nproc = multiprocessing.cpu_count()
+            aares.my_print('Using {} processors.'.format(self.params.nproc))
+            with concurrent.futures.ProcessPoolExecutor(self.params.nproc) as ex:
+                jobs = []
+                try:
+                    for name in fls.files(key='name'):
+                        fi_path = fls.get_file_scope(name).path
+                        aares.my_print('\nDrawing: {}'.format(name))
+                        jobs.append(ex.submit(draw_file,
+                                              fi_path,
+                                              output=os.path.join(out_dir,name+'.png'),
+                                              params=self.params))
+                        # draw_file(fi_path,
+                        #           output=os.path.join(out_dir,name+'.png'),
+                        #           params=self.params)
+                    concurrent.futures.wait(jobs)
+                except KeyboardInterrupt:
+                    print('Stopping...')
+                    for job in jobs:
+                        job.cancel()
+                    raise KeyboardInterrupt
         else:
             raise aares.RuntimeErrorUser('Unsupported file type: {}'.format(self.params.input))
 
