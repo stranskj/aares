@@ -14,6 +14,7 @@ Importing data files
 
 import aares
 import logging
+import aares.report
 
 __all__ = []
 __version__ = aares.__version__
@@ -119,6 +120,7 @@ class JobImport(aares.Job):
                                        run_phil = self.params.to_import,
                            suffixes=self.params.to_import.suffix,
                            ignore_merged=self.params.to_import.ignore_merged)
+                aares.report.log_number_of_frames(new_files)
                 aares.my_print('Identified {} new or modified files.'.format(len(new_files)))
 
             if len(run.files_dict) == 0:
@@ -128,6 +130,7 @@ class JobImport(aares.Job):
             run.header_file = self.params.to_import.headers
         else:
             run = aares.datafiles.DataFilesCarrier(run_phil=self.params.to_import, mainphil=self.system_phil)
+            aares.report.log_number_of_frames(run.files_dict)
 
         files = aares.datafiles.phil_files.format(run.file_groups)
         #       print(files.as_str(expert_level=0))
