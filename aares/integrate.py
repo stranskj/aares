@@ -22,6 +22,7 @@ import aares.datafiles
 import aares.q_transformation
 import aares.mask
 import aares.export
+import aares.statistics
 
 import concurrent.futures
 import os, logging
@@ -134,6 +135,9 @@ phil_job_core = phil.parse('''
         input_files = binned.fls
         .type = path
         .help = Updated descriptor of the input files.
+        bin_redundancy = redundancy.dat
+        .type = path
+        .help = Number of pixels per resolution 
     }
 
     ''' + phil_core_str + '''
@@ -413,6 +417,13 @@ def integrate_group(group, data_dictionary, job_control=None, output=None, expor
 
     aares.my_print('Reading bin masks: {}'.format(params.reduction.file_bin_masks))
     bin_masks_obj = ReductionBins(params.reduction.file_bin_masks)
+
+    # Write the pixel redundancies, a bit MEH placement
+    fiout_redundancies = os.path.splitext(output.bin_redundancy)[0] + '_' + group.name + \
+                         os.path.splitext(output.bin_redundancy)[1]
+    aares.statistics.export_redundancy(bin_masks_obj, fiout_redundancies, separator=export.separator)
+    aares.my_print('Pixel redundancy written to: {}'.format(fiout_redundancies))
+
     aares.my_print('Reading Q-space data: {}'.format(group.scope_extract.q_space))
     arrQ = aares.q_transformation.ArrayQ(group.scope_extract.q_space)
     if normalize_beam:
@@ -815,6 +826,7 @@ class JobReduction(aares.Job):
         else:
             raise aares.RuntimeWarningUser(
                 'Not implemented yet, please use aares.import -> aares.q_transformation')
+
 
       #  aares.my_print('Using error model: {}\n'.format(self.params.reduction.error_model))
         for group in imported_files.file_groups:
