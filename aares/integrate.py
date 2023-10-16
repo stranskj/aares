@@ -237,7 +237,45 @@ def list_integration_masks(q_bins, q_array, frame_mask=None):
 
     return list(q_masks)
 
+def integrate_file_by_frame(header, q_masks, q_bins, start_frame=1, prefix='frame', numdigit=None,
+                   nproc=None, scale=None, scale_transmitance=False, sep=" "):
+    """
+    Integrates individual frames of the file
+    :param header: File header
+    :type header: h5z.SaxspointH5
+    :param q_masks: Binning masks
+    :param prefix: Prefix for the file output
+    :param start_frame: Numbering of the first frame
+    :param nproc: Number of CPUs to be used
+    :param sep: Column separator in the output
+    :return:
+"""
 
+    if numdigit is None:
+        numdigit = int(math.log10(len(header['entry/data/time']))) + 1
+
+    aares.my_print('Reducing file: {}'.format(header.path))
+    with h5z.FileH5Z(header.path) as h5f:
+        if scale_transmitance:
+            transmitance = header.transmitance
+        else:
+            transmitance = 1.0
+        for frame in h5f['entry/data/data'][:]:
+            avr, std, num = aares.integrate.integrate_mp(frame, q_masks, nproc)
+            avr *= transmitance
+            std *= transmitance
+            if scale is not None:
+                frame_scale = scale / avr[-1]
+                avr = avr[:-1] * frame_scale
+                std = std[:,:-1] * abs(frame_scale)
+                # avr = avr[:-1]
+                # std = std[:-1]
+                num = num[:-1]
+            aares.export.write_atsas(q_bins, avr, std[1], #TODO: pick error model
+                                     file_name=prefix + str(start_frame).zfill(numdigit) + '.dat',
+                                     header=['# {} {}'.format(header.path,
+                                                              str(start_frame).zfill(numdigit))])
+            start_frame += 1
 def integrate(frame_arr, bin_masks):
     '''
     Calculate averages and stddevs across frames in all bins
@@ -333,72 +371,47 @@ def process_file(header, file_out, frames=None, export=None, reduction = None,
                  nproc=None,
                  by_frame=False):
 
-    if by_frame:
-        logging.debug('Processing by individual frames.')
-        aares.my_print(header.path)
-        with (concurrent.futures.ProcessPoolExecutor(max_workers=nproc) as ex,
-              tqdm.tqdm(total=header.number_of_frames) as pbar):
-            jobs = []
-            pbar.update(0)
-            for frame in range(header.number_of_frames):
-                fi_out = os.path.splitext(file_out)[0]+"_{:03d}".format(frame+1)+os.path.splitext(file_out)[1]
-                jobs.append(ex.submit(process_file, header, fi_out, frames=frame, export=export,
-                                      reduction = reduction,
-                                      bin_masks=bin_masks,
-                                      q_val=q_val,
-                                      scale=scale,
-                                      scale_transmitance=scale_transmitance,
-                                      error_model=error_model,
-                                      nproc=1,
-                                      by_frame=False))
+    aares.my_print(header.path)
 
-            for job in concurrent.futures.as_completed(jobs):
-                pbar.update(1)
+    if frames is None:
+        data = header.data
+    elif isinstance(frames,int):
+        data = header.data[frames]
+    else:
+        try:
+            data = aares.slice_array(header.data, intervals=frames, axis=0)
+            logging.info('Only {} frames were used from: {}'.format(numpy.size(data, axis=0), header.path))
+        except IndexError as err:
+            raise aares.RuntimeErrorUser(repr(err)+'\nError while processing file: {}\nCould not select specified frames. Note that frame indices are 0-based.'.format(header.path))
 
-    else:       # Not by frame
-        if not isinstance(frames,int):
-            aares.my_print(header.path)
+    averages, stddev, num = integrate_mp(data, bin_masks=bin_masks, nproc=nproc)
+    if scale is not None:
+        frame_scale = scale / averages[-1]
+        averages = averages[:-1] * frame_scale
+        stddev = stddev[:,:-1] * abs(frame_scale)
+        # avr = avr[:-1]
+        # std = std[:-1]
+        num = num[:-1]
 
-        if frames is None:
-            data = header.data
-        elif isinstance(frames,int):
-            data = header.data[frames]
-        else:
-            try:
-                data = aares.slice_array(header.data, intervals=frames, axis=0)
-                logging.info('Only {} frames were used from: {}'.format(numpy.size(data, axis=0), header.path))
-            except IndexError as err:
-                raise aares.RuntimeErrorUser(repr(err)+'\nError while processing file: {}\nCould not select specified frames. Note that frame indices are 0-based.'.format(header.path))
+    if scale_transmitance:
+        transmitance = header.transmitance
+        averages *= transmitance
+        stddev *= transmitance
 
-        averages, stddev, num = integrate_mp(data, bin_masks=bin_masks, nproc=nproc)
-        if scale is not None:
-            frame_scale = scale / averages[-1]
-            averages = averages[:-1] * frame_scale
-            stddev = stddev[:,:-1] * abs(frame_scale)
-            # avr = avr[:-1]
-            # std = std[:-1]
-            num = num[:-1]
+    error_model = reduction.error_model
+    #pick of stddev
+    if error_model == '3d':
+        stddev = stddev[0]
+    elif error_model == 'pixel':
+        stddev = stddev[2]
+    elif error_model == 'poisson':
+        stddev = stddev[1]
+    else:
+        raise aares.RuntimeErrorUser('Unknown error model: {}'.format(error_model))
 
-        if scale_transmitance:
-            transmitance = header.transmitance
-            averages *= transmitance
-            stddev *= transmitance
-
-        error_model = reduction.error_model
-        #pick of stddev
-        if error_model == '3d':
-            stddev = stddev[0]
-        elif error_model == 'pixel':
-            stddev = stddev[2]
-        elif error_model == 'poisson':
-            stddev = stddev[1]
-        else:
-            raise aares.RuntimeErrorUser('Unknown error model: {}'.format(error_model))
-
-        aares.export.write_atsas(q_val, averages,stddev,
-                                 file_name=file_out,
-                                 header=['# {}\n'.format(header.path)])
-
+    aares.export.write_atsas(q_val, averages,stddev,
+                             file_name=file_out,
+                             header=['# {}\n'.format(header.path)])
 
 
 def integrate_group(group, data_dictionary, job_control=None, output=None, export=None,
@@ -526,22 +539,35 @@ def integrate_group(group, data_dictionary, job_control=None, output=None, expor
         files_out = [os.path.join(output.by_frame, fi.name + '.dat')
                      for fi in group.scope_extract.file]  # TODO: use info from export or so
 
-        process_partial = partial(process_file,
-                                  export=export,
-                                  bin_masks=bin_masks,
-                                  q_val=bin_masks_obj.q_axis,
-                                  scale=params.reduction.beam_normalize.scale,
-                                  scale_transmitance=scale_transmitance,
-                                  reduction=reduction,
-                                  nproc=job_control.threads,
-                                  by_frame=True
-                                  )
-        aares.power.map_mp(process_partial,
-                           files,
-                           files_out,
-                           frames,
-                           nchunks=job_control.jobs
-                           )
+        with concurrent.futures.ProcessPoolExecutor(max_workers=job_control.jobs) as ex:
+            jobs = []
+            for fi, fiout in zip(files, files_out):
+                jobs.append(ex.submit(integrate_file_by_frame, fi,
+                                     q_masks=bin_masks,
+                                     q_bins=bin_masks_obj.q_axis,
+                                     prefix= fiout,
+                                     scale=params.reduction.beam_normalize.scale,
+                                     scale_transmitance=scale_transmitance,
+                                     nproc=job_control.threads
+                                      ))
+            concurrent.futures.wait(jobs)
+  #      integrate_file_by_frame(header,q_masks=bin_masks, q_bins=q_val, prefix=)
+
+   #      process_partial = partial(integrate_file_by_frame,
+   # #                               export=export,
+   #                                q_masks=bin_masks,
+   #                                q_bins=bin_masks_obj.q_axis,
+   #                                scale=params.reduction.beam_normalize.scale,
+   #                                scale_transmitance=scale_transmitance,
+   #                                nproc=job_control.threads,
+   #
+   #                                )
+   #      aares.power.map_mp(process_partial,
+   #                         files,
+   #                         files_out,
+   #                         #frames,
+   #                         nchunks=job_control.jobs
+   #                         )
 
 
 def prepare_bins(arrQ, qmin=None, qmax=None, bins=None, frame_mask=None, skip_empty=True):
