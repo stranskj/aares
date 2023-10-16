@@ -27,6 +27,7 @@ import aares.statistics
 import concurrent.futures
 import os, logging
 import freephil as phil
+import tqdm
 
 prog_short_description = 'Performs data reduction from 2D to 1D.'
 
@@ -90,6 +91,10 @@ reduction
     .type = bool
     .help = If the bin contains zero pixels, it is ignored.
 
+    by_frame = False
+    .type = bool
+    .help = Integrate also individual frames  
+
 }     
 '''
 
@@ -126,12 +131,14 @@ phil_job_core = phil.parse('''
                 'name' - same as the name in the AAres imported files;
                 'sample' - as sample name specified in data file header. A number is preceeded to guarantee uniquenes. No order is guaranteed."
     }
-    
-    
+   
     output {
         directory = 'reduced'
         .type = path
         .help = Output folder for the processed data
+        by_frame = None
+        .type = path
+        .help = Output folder for processing of individual frames
         input_files = binned.fls
         .type = path
         .help = Updated descriptor of the input files.
@@ -323,50 +330,79 @@ def process_file(header, file_out, frames=None, export=None, reduction = None,
                  scale=None,
                  scale_transmitance=False,
                  error_model='3d',
-                 nproc=None):
+                 nproc=None,
+                 by_frame=False):
 
-    aares.my_print(header.path)
+    if by_frame:
+        logging.debug('Processing by individual frames.')
+        aares.my_print(header.path)
+        with (concurrent.futures.ProcessPoolExecutor(max_workers=nproc) as ex,
+              tqdm.tqdm(total=header.number_of_frames) as pbar):
+            jobs = []
+            pbar.update(0)
+            for frame in range(header.number_of_frames):
+                fi_out = os.path.splitext(file_out)[0]+"_{:03d}".format(frame+1)+os.path.splitext(file_out)[1]
+                jobs.append(ex.submit(process_file, header, fi_out, frames=frame, export=export,
+                                      reduction = reduction,
+                                      bin_masks=bin_masks,
+                                      q_val=q_val,
+                                      scale=scale,
+                                      scale_transmitance=scale_transmitance,
+                                      error_model=error_model,
+                                      nproc=1,
+                                      by_frame=False))
 
-    if frames is None:
-        data = header.data
-    else:
-        try:
-            data = aares.slice_array(header.data, intervals=frames, axis=0)
-            logging.info('Only {} frames were used from: {}'.format(numpy.size(data, axis=0), header.path))
-        except IndexError as err:
-            raise aares.RuntimeErrorUser(repr(err)+'\nError while processing file: {}\nCould not select specified frames. Note that frame indices are 0-based.'.format(header.path))
+            for job in concurrent.futures.as_completed(jobs):
+                pbar.update(1)
 
-    averages, stddev, num = integrate_mp(data, bin_masks=bin_masks, nproc=nproc)
-    if scale is not None:
-        frame_scale = scale / averages[-1]
-        averages = averages[:-1] * frame_scale
-        stddev = stddev[:,:-1] * abs(frame_scale)
-        # avr = avr[:-1]
-        # std = std[:-1]
-        num = num[:-1]
+    else:       # Not by frame
+        if not isinstance(frames,int):
+            aares.my_print(header.path)
 
-    if scale_transmitance:
-        transmitance = header.transmitance
-        averages *= transmitance
-        stddev *= transmitance
+        if frames is None:
+            data = header.data
+        elif isinstance(frames,int):
+            data = header.data[frames]
+        else:
+            try:
+                data = aares.slice_array(header.data, intervals=frames, axis=0)
+                logging.info('Only {} frames were used from: {}'.format(numpy.size(data, axis=0), header.path))
+            except IndexError as err:
+                raise aares.RuntimeErrorUser(repr(err)+'\nError while processing file: {}\nCould not select specified frames. Note that frame indices are 0-based.'.format(header.path))
 
-    error_model = reduction.error_model
-    #pick of stddev
-    if error_model == '3d':
-        stddev = stddev[0]
-    elif error_model == 'pixel':
-        stddev = stddev[2]
-    elif error_model == 'poisson':
-        stddev = stddev[1]
-    else:
-        raise aares.RuntimeErrorUser('Unknown error model: {}'.format(error_model))
+        averages, stddev, num = integrate_mp(data, bin_masks=bin_masks, nproc=nproc)
+        if scale is not None:
+            frame_scale = scale / averages[-1]
+            averages = averages[:-1] * frame_scale
+            stddev = stddev[:,:-1] * abs(frame_scale)
+            # avr = avr[:-1]
+            # std = std[:-1]
+            num = num[:-1]
 
-    aares.export.write_atsas(q_val, averages,stddev,
-                             file_name=file_out,
-                             header=['# {}\n'.format(header.path)])
+        if scale_transmitance:
+            transmitance = header.transmitance
+            averages *= transmitance
+            stddev *= transmitance
+
+        error_model = reduction.error_model
+        #pick of stddev
+        if error_model == '3d':
+            stddev = stddev[0]
+        elif error_model == 'pixel':
+            stddev = stddev[2]
+        elif error_model == 'poisson':
+            stddev = stddev[1]
+        else:
+            raise aares.RuntimeErrorUser('Unknown error model: {}'.format(error_model))
+
+        aares.export.write_atsas(q_val, averages,stddev,
+                                 file_name=file_out,
+                                 header=['# {}\n'.format(header.path)])
 
 
-def integrate_group(group, data_dictionary, job_control=None, output=None, export=None, reduction=None):
+
+def integrate_group(group, data_dictionary, job_control=None, output=None, export=None,
+                    reduction=None):
     '''
     Integrates group of files
 
@@ -461,7 +497,8 @@ def integrate_group(group, data_dictionary, job_control=None, output=None, expor
                               scale=params.reduction.beam_normalize.scale,
                               scale_transmitance=scale_transmitance,
                               reduction=reduction,
-                              nproc=job_control.threads
+                              nproc=job_control.threads,
+                              by_frame=False
                               )
 
     files = [data_dictionary[fi.path] for fi in group.scope_extract.file]
@@ -475,6 +512,36 @@ def integrate_group(group, data_dictionary, job_control=None, output=None, expor
                        frames,
                        nchunks=job_control.jobs
                        )
+    if reduction.by_frame:
+        aares.my_print('Reducing files by individual frames:')
+        if output.by_frame is None:
+            output.by_frame = output.directory+"_by_frame"
+            logging.info('Writting individual frames to: {}'.format(output.by_frame))
+        if not os.path.exists(output.by_frame):
+            logging.info('Creating directory: {}'.format(output.by_frame))
+            os.mkdir(output.by_frame)
+        if not os.path.isdir(output.by_frame):
+            raise aares.RuntimeErrorUser('Path is not a directory: {}'.format(output.my_frame))
+
+        files_out = [os.path.join(output.by_frame, fi.name + '.dat')
+                     for fi in group.scope_extract.file]  # TODO: use info from export or so
+
+        process_partial = partial(process_file,
+                                  export=export,
+                                  bin_masks=bin_masks,
+                                  q_val=bin_masks_obj.q_axis,
+                                  scale=params.reduction.beam_normalize.scale,
+                                  scale_transmitance=scale_transmitance,
+                                  reduction=reduction,
+                                  nproc=job_control.threads,
+                                  by_frame=True
+                                  )
+        aares.power.map_mp(process_partial,
+                           files,
+                           files_out,
+                           frames,
+                           nchunks=job_control.jobs
+                           )
 
 
 def prepare_bins(arrQ, qmin=None, qmax=None, bins=None, frame_mask=None, skip_empty=True):
