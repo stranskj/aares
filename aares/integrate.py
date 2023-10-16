@@ -536,7 +536,7 @@ def integrate_group(group, data_dictionary, job_control=None, output=None, expor
         if not os.path.isdir(output.by_frame):
             raise aares.RuntimeErrorUser('Path is not a directory: {}'.format(output.my_frame))
 
-        files_out = [os.path.join(output.by_frame, fi.name + '.dat')
+        files_out = [os.path.join(output.by_frame, os.path.splitext(fi.name)[0] + '_')
                      for fi in group.scope_extract.file]  # TODO: use info from export or so
 
         with concurrent.futures.ProcessPoolExecutor(max_workers=job_control.jobs) as ex:
