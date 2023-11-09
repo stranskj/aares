@@ -79,40 +79,8 @@ input {
 include scope aares.power.phil_job_control
 ''', process_includes=True)
 
+integrate_file = aares.integrate.integrate_file_by_frame
 
-def integrate_file(header, q_masks, q_bins, start_frame=1, prefix='frame', numdigit=None,
-                   nproc=None, scale=None, sep=" "):
-    """
-    Integrates individual frames of the file
-    :param header: File header
-    :type header: h5z.SaxspointH5
-    :param q_masks: Binning masks
-    :param prefix: Prefix for the file output
-    :param start_frame: Numbering of the first frame
-    :param nproc: Number of CPUs to be used
-    :param sep: Column separator in the output
-    :return:
-"""
-
-    if numdigit is None:
-        numdigit = int(math.log10(len(header['entry/data/time']))) + 1
-
-    aares.my_print('Reducing file: {}'.format(header.path))
-    with h5z.FileH5Z(header.path) as h5f:
-        for frame in h5f['entry/data/data'][:]:
-            avr, std, num = aares.integrate.integrate_mp(frame, q_masks, nproc)
-            if scale is not None:
-                frame_scale = scale / avr[-1]
-                avr = avr[:-1] * frame_scale
-                std = std[:,:-1] * abs(frame_scale)
-                # avr = avr[:-1]
-                # std = std[:-1]
-                num = num[:-1]
-            aares.export.write_atsas(q_bins, avr, std[1], #TODO: pick error model
-                                     file_name=prefix + str(start_frame).zfill(numdigit) + '.dat',
-                                     header=['# {} {}'.format(header.path,
-                                                              str(start_frame).zfill(numdigit))])
-            start_frame += 1
 
 
 def run(params):
