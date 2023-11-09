@@ -138,7 +138,7 @@ phil_job_core = phil.parse('''
         .help = Output folder for the processed data
         by_frame = None
         .type = path
-        .help = Output folder for processing of individual frames
+        .help = Output folder for processing of individual frames. If set, the processing of individual frames will be performed. Automatically determined, if left blank.
         input_files = binned.fls
         .type = path
         .help = Updated descriptor of the input files.
@@ -808,6 +808,7 @@ class JobReduction(aares.Job):
         pass
 
     def __process_unhandled__(self):
+
         for param in self.unhandled:
             if aares.datafiles.is_fls(param):
                 self.params.input_files = param
@@ -845,7 +846,9 @@ class JobReduction(aares.Job):
         #     pass
 
     def __worker__(self):
-
+        if self.params.output.by_frame is not None:
+            self.params.reduction.by_frame = True
+            logging.info('Output directory for by-frame reduction provided, performing the by-frame reduction.')
         if self.params.input_files is not None:
             imported_files = aares.datafiles.DataFilesCarrier(file_phil=self.params.input_files,
                                                               mainphil=phil_core)
@@ -874,8 +877,7 @@ class JobReduction(aares.Job):
 
                 if group.group_phil.reduction.file_bin_masks is not None \
                         and os.path.isfile(group.group_phil.reduction.file_bin_masks) \
-                        and (
-                        not group_write):  # TODO: only if binnig parameters did not change.... No skipped when other like "beamstop" used
+                        and (not group_write):  # TODO: only if binnig parameters did not change.... No skipped when other like "beamstop" used
                     aares.my_print(
                         'Reading from file {}...'.format(group.group_phil.reduction.file_bin_masks))
                     group_bins = ReductionBins(group.group_phil.reduction.file_bin_masks)
