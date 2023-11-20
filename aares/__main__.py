@@ -9,6 +9,7 @@ from aares import my_print
 import sys
 import pkg_resources
 import importlib
+import importlib.metadata
 import logging
 
 import freephil as phil
@@ -46,13 +47,13 @@ def epilog():
         else:
             suffix = ''
 
-        for ep in (ept for ept in pkg_resources.iter_entry_points('console_scripts')  # ):
-                   if 'aares' in ept.module_name):
+        for ep in (ept for ept in importlib.metadata.entry_points(group='console_scripts')  # ):
+                   if 'aares' in ept.name):
             try:
-                module = importlib.import_module(ep.module_name)
+                module = importlib.import_module(ep.name)
                 return_str += ep.name + suffix + '\n\t' + module.prog_short_description + '\n\n'
             except:
-                return_str += 'Cannot find {}\nTry reinstall the package.\n\n'.format(ep.module_name)
+                return_str += 'Cannot find {}\nTry reinstall the package.\n\n'.format(ep.name)
     except Exception as e:
         logging.exception(e)
         return_str += 'Here is typically list of available commands. Something is wrong.'

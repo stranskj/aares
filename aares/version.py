@@ -1,10 +1,9 @@
-import time, datetime
 
 
 def version_by_pkg():
     try:
-        import pkg_resources
-        return pkg_resources.get_distribution('aares')
+        import importlib.metadata
+        return importlib.metadata.version('aares')
 
     except ImportError:
         return 'Unknown, something is wrong with the Python installation'
