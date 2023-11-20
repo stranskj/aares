@@ -19,10 +19,9 @@ import h5py
 import os
 from abc import ABC, abstractmethod
 import logging
-#from saxspoint import my_print
+# from saxspoint import my_print
 import copy
 import numpy as np
-
 
 
 @contextmanager
@@ -45,6 +44,7 @@ def FileH5Z(name, file_mode='r', *args, **kwargs):
             raise NotImplementedError('file_mode = {}'.format(file_mode))
     finally:
         pass
+
 
 def is_h5_file(name):
     '''
@@ -131,6 +131,7 @@ def recompress(path1, path2, log=False, compression='gzip'):
         walk(in_file, out_file, log=log, compression=compression)
     return os.stat(path1).st_size, os.stat(path2).st_size
 
+
 def groupH5_to_scope(group):
     '''
 
@@ -138,6 +139,7 @@ def groupH5_to_scope(group):
     :return:
     '''
     pass
+
 
 def datasetH5_to_scope(dataset, max_length=20):
     '''
@@ -172,6 +174,7 @@ def phil_to_h5(scope):
     '''
     pass
 
+
 class DatasetH5(np.ndarray):
     """
     Class mimicking h5py.Dataset
@@ -184,14 +187,15 @@ class DatasetH5(np.ndarray):
     def __new__(self, source_dataset=None, name=None, *args, **kwargs):
 
         if source_dataset is not None:
-            if isinstance(source_dataset,np.ndarray):
+            if isinstance(source_dataset, np.ndarray):
                 if np.isfortran(source_dataset):
                     order = 'F'
                 else:
                     order = 'C'
             else:
                 order = 'C'
-            obj = super().__new__(self, source_dataset.shape, source_dataset.dtype, buffer=source_dataset[()], order=order)
+            obj = super().__new__(self, source_dataset.shape, source_dataset.dtype,
+                                  buffer=source_dataset[()], order=order)
         else:
             obj = super().__new__(self, *args, **kwargs)
         obj.attrs = {}
@@ -207,7 +211,6 @@ class DatasetH5(np.ndarray):
             for key, val in source_dataset.attrs.items():
                 self.attrs[key] = copy.copy(val)
             self.name = source_dataset.name
-
 
     # It has to be here because standard np.array childs have problems with pickling new attributes
     # It is important for multiprocessing to work
@@ -232,26 +235,26 @@ class DatasetH5(np.ndarray):
 
     # End of the pickling stuff
 
-    def __eq__(self, other): # It breaks numpy's elements vice comparison
-        if not (isinstance(other, DatasetH5) or isinstance(other,h5py.Dataset)):
+    def __eq__(self, other):  # It breaks numpy's elements vice comparison
+        if not (isinstance(other, DatasetH5) or isinstance(other, h5py.Dataset)):
             # don't attempt to compare against unrelated types
             return NotImplemented
         attr_bool = True
         try:
             attr_bool = len(self.attrs) == len(other.attrs)
             for key, val in self.attrs.items():
-                attr_bool = attr_bool and (val==other.attrs[key])
+                attr_bool = attr_bool and (val == other.attrs[key])
         except KeyError:
             attr_bool = False
         except AttributeError:
             pass
-        return  attr_bool and np.array_equal(self, other)
+        return attr_bool and np.array_equal(self, other)
 
     # Custom might fix previous...
     def __getitem__(self, item):
         return np.array(super().__getitem__(item))
 
-    def write(self, parent, bigger_than = 100, compression = 'gzip', **kwargs):
+    def write(self, parent, bigger_than=100, compression='gzip', **kwargs):
         '''
         Function used for writing the group to the H5 file
         :param parent: Parent group to be saved in
@@ -272,12 +275,14 @@ def ItemH5(item_in):
     :return: GroupH5 or DatasetH5
     """
 
-    if isinstance(item_in, h5py.Group) or isinstance(item_in,GroupH5):
+    if isinstance(item_in, h5py.Group) or isinstance(item_in, GroupH5):
         return GroupH5(item_in)
-    elif isinstance(item_in, h5py.Dataset) or isinstance(item_in,DatasetH5):
+    elif isinstance(item_in, h5py.Dataset) or isinstance(item_in, DatasetH5):
         return DatasetH5(item_in)
     else:
-        raise TypeError('The input type has to be h5py.Group, h5py.Dataset, GroupH5, or DatasetH5. Given: {}'.format(type(item_in)))
+        raise TypeError(
+            'The input type has to be h5py.Group, h5py.Dataset, GroupH5, or DatasetH5. Given: {}'.format(
+                type(item_in)))
 
 
 class GroupH5(dict):
@@ -337,27 +342,29 @@ class GroupH5(dict):
         if split_key == ['']:
             raise KeyError
         elif len(split_key) == 1:
-            dict.__setitem__(self, split_key[0],value)
+            dict.__setitem__(self, split_key[0], value)
         else:
             if split_key[0] not in self:
-                dict.__setitem__(self, split_key[0], GroupH5(name=self.name+'/'+split_key[0]))
+                dict.__setitem__(self, split_key[0], GroupH5(name=self.name + '/' + split_key[0]))
             if not isinstance(self[split_key[0]], GroupH5):
-                raise KeyError('The existing key cannot be extended, because it is not GroupH5 object. "{}"'.format(key))
+                raise KeyError(
+                    'The existing key cannot be extended, because it is not GroupH5 object. "{}"'.format(
+                        key))
 
             self[split_key[0]][split_key[1]] = value
 
     def __eq__(self, other):
-        if not (isinstance(other, GroupH5) or isinstance(other,h5py.Group)):
+        if not (isinstance(other, GroupH5) or isinstance(other, h5py.Group)):
             # don't attempt to compare against unrelated types
             return NotImplemented
         try:
             attr_bool = len(self.attrs) == len(other.attrs)
             for key, val in self.attrs.items():
-                attr_bool = attr_bool and (val==other.attrs[key])
+                attr_bool = attr_bool and (val == other.attrs[key])
         except KeyError or AttributeError:
             attr_bool = False
 
-        return  super().__eq__(other) and attr_bool
+        return super().__eq__(other) and attr_bool
 
     def write(self, parent, **kwargs):
         '''
@@ -388,10 +395,12 @@ class GroupH5(dict):
 
         return out_items
 
+
 class InstrumentFileH5(ABC):
     """
     Abstract class describing generic H5-like files to be used as files containing data
     """
+
     @property
     @abstractmethod
     def geometry_fields(self):
@@ -422,7 +431,7 @@ class InstrumentFileH5(ABC):
 
     def __getitem__(self, key):
         if key in self.skip_entries:
-            with FileH5Z(self.abs_path,'r') as h5f:
+            with FileH5Z(self.abs_path, 'r') as h5f:
                 val = ItemH5(h5f[key])
         else:
             val = self._h5[key]
@@ -453,7 +462,7 @@ class InstrumentFileH5(ABC):
         return val
 
     @_h5.setter
-    def _h5(self,val):
+    def _h5(self, val):
         self.__h5 = val
 
     @property
@@ -461,14 +470,14 @@ class InstrumentFileH5(ABC):
         return self._h5.attrs
 
     def read_header(self, path=None, **filters):
-        #TODO: create as constructor option; store in member variable, if one of those attempted to read later, reopen the file
+        # TODO: create as constructor option; store in member variable, if one of those attempted to read later, reopen the file
 
         if path is None:
             try:
                 path = self.attrs['abs_path']
             except AttributeError:
                 raise AttributeError('Path to the file was not given or set.')
-        #TODO : handle missing/wrong file exceptions
+        # TODO : handle missing/wrong file exceptions
         with FileH5Z(path, 'r', **filters) as h5z:
             # walk(h5z, self._h5, skip=skip_entries, **filters)
             # for key, val in h5z.attrs.items():
@@ -512,11 +521,11 @@ class SaxspointH5(InstrumentFileH5):
     :ivar geometry_fields: List of fields, which describe the experiment geometry
     """
     skip_entries = ['entry/data/data',
-                        'entry/data/x_pixel_offset',
-                        'entry/data/y_pixel_offset',
-                        'entry/instrument/detector/data',
-                        #'entry/instrument/detector/x_pixel_offset',
-                        #'entry/instrument/detector/y_pixel_offset',
+                    'entry/data/x_pixel_offset',
+                    'entry/data/y_pixel_offset',
+                    'entry/instrument/detector/data',
+                    # 'entry/instrument/detector/x_pixel_offset',
+                    # 'entry/instrument/detector/y_pixel_offset',
                     ]
 
     geometry_fields = [
@@ -570,7 +579,7 @@ class SaxspointH5(InstrumentFileH5):
         if is_h5_file(val):
             with  FileH5Z(val, 'r') as fin:
                 attributes.update(fin.attrs)
-        elif isinstance(val, GroupH5) or isinstance(val,h5py.Group):
+        elif isinstance(val, GroupH5) or isinstance(val, h5py.Group):
             attributes.update(val.attrs)
         else:
             raise TypeError('Input should be h5py.Group-like object.')
@@ -596,14 +605,14 @@ class SaxspointH5(InstrumentFileH5):
             for itm in self.geometry_fields:
                 self[itm]
         except KeyError:
-            logging.debug('File {}\ndoes not contain "{}"'.format(self.abs_path,itm))
+            logging.debug('File {}\ndoes not contain "{}"'.format(self.abs_path, itm))
             return False
         if len(self['entry/data']) == 0:
             logging.debug('File {}\ndoes not contain any data.'.format(self.abs_path))
             return False
         return True
 
-    def update_abs_path(self,abs_path = None):
+    def update_abs_path(self, abs_path=None):
         '''
         Updates abs_path entry. Based on "path", if intput is None
         :param abs_path:
@@ -657,6 +666,7 @@ class SaxspointH5(InstrumentFileH5):
         y = -det[1] / pix[1]
 
         return x, y
+
     @property
     def frame_size(self):
         '''
@@ -695,13 +705,13 @@ class SaxspointH5(InstrumentFileH5):
 
     @time_offset.setter
     def time_offset(self, val):
-        self['entry/instrument/detector/time'] = DatasetH5(source_dataset=val,name='time')
+        self['entry/instrument/detector/time'] = DatasetH5(source_dataset=val, name='time')
         self['entry/instrument/detector/time'].attrs['axis'] = 3
         self['entry/instrument/detector/time'].attrs['axis_location'] = 1
         self['entry/instrument/detector/time'].attrs['primary'] = 1
         self['entry/instrument/detector/time'].attrs['long_name'] = 'Time'
         self['entry/instrument/detector/time'].attrs['units'] = 's'
-        self['entry/data/time'] = DatasetH5(source_dataset=val,name='time')
+        self['entry/data/time'] = DatasetH5(source_dataset=val, name='time')
         copy_attributes(self['entry/instrument/detector/time'], self['entry/data/time'])
 
     @property
@@ -720,9 +730,10 @@ class SaxspointH5(InstrumentFileH5):
         :return: numpy.array
         """
         return self['entry/data/data']
+
     @data.setter
     def data(self, val):
-        dts = DatasetH5(source_dataset=val,name='data')
+        dts = DatasetH5(source_dataset=val, name='data')
         dts.attrs['long_name'] = 'Counts'
         dts.attrs['signal'] = 1
         dts.attrs['units'] = 's'
@@ -735,6 +746,7 @@ class SaxspointH5(InstrumentFileH5):
         :return:
         """
         return self.attrs['path']
+
     @path.setter
     def path(self, val):
         self.attrs['path'] = val
@@ -746,6 +758,7 @@ class SaxspointH5(InstrumentFileH5):
         :return:
         """
         return self.attrs['abs_path']
+
     @abs_path.setter
     def abs_path(self, val):
         self.attrs['abs_path'] = val
@@ -754,11 +767,13 @@ class SaxspointH5(InstrumentFileH5):
     def transmitance(self):
         '''Returns transmitance value for the data. Returns None, if not available'''
         try:
-            transmitance = float(self['entry/data/flux_exiting_sample'])/float(self['entry/data/flux_entering_sample'])
+            transmitance = float(self['entry/data/flux_exiting_sample']) / float(
+                self['entry/data/flux_entering_sample'])
         except KeyError:
             transmitance = None
 
         return transmitance
+
 
 def test_equal_Datasets():
     f1 = 'data/10x1s.h5'
@@ -770,6 +785,7 @@ def test_equal_Datasets():
     dataset2 = header['entry/data/sdd']
     assert dataset1 == dataset2
 
+
 def test_equal_Groups():
     f1 = 'data/10x60s_363mm_010Frames.h5'
     header = SaxspointH5(f1)
@@ -779,21 +795,23 @@ def test_equal_Groups():
     header = SaxspointH5(f2)
     header2 = header['entry/instrument/detector']
 
-  #  with FileH5Z(f1,'r') as h5z1, FileH5Z(f2,'r') as h5z2:
+    #  with FileH5Z(f1,'r') as h5z1, FileH5Z(f2,'r') as h5z2:
 
-   #     dc1 = h5z1['entry/sample']
+    #     dc1 = h5z1['entry/sample']
     #    dc2 = h5z2['entry/sample']
 
-     #   assert header2 == dc1
-    #header1 = SaxspointH5('data/10x1s.h5')
-    #header2 = SaxspointH5('data/10x1s.h5')
+    #   assert header2 == dc1
+    # header1 = SaxspointH5('data/10x1s.h5')
+    # header2 = SaxspointH5('data/10x1s.h5')
 
     assert header1 == header2
+
 
 def test_DatasetH5():
     a = np.full(1, np.nan)
     dts = DatasetH5(a)
     print(dts)
+
 
 def test_SaxspointH5_name():
     finame = '../data/named_LVA_3.01/lys_RC3/Temperature_293.2K/SDD_570mm/lys_RC3_Temperature_293.2K_SDD_570mm_010Frames.h5z'
@@ -801,6 +819,7 @@ def test_SaxspointH5_name():
     sample_name = fh5.sample_name
     assert sample_name == 'buffer'
     pass
+
 
 if __name__ == "__main__":
     test_equal_Datasets()

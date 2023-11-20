@@ -10,7 +10,7 @@ test-logs
 *.bck
 __pycache__
 *.egg-info
-.eggs
+.eggs_old
 dist
 .tox
 .idea
