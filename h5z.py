@@ -24,6 +24,9 @@ import copy
 import numpy as np
 
 
+hdf5_version = h5py.version.hdf5_version
+
+
 @contextmanager
 def FileH5Z(name, file_mode='r', *args, **kwargs):
     """
