@@ -445,14 +445,24 @@ class InstrumentFileH5(ABC):
 
     @property
     @abstractmethod
-    def transmitance(self):
-        '''Returns transmitance value for the data. Returns None, if not available'''
+    def transmittance(self):
+        '''Returns transmittance value for the data. Returns None, if not available'''
         return None
 
     @property
     @abstractmethod
-    def transmitance(self):
+    def sample_name(self):
         '''Returns sample name. Returns None, if not available'''
+        return None
+
+    @property
+    @abstractmethod
+    def path(self):
+        return None
+
+    @property
+    @abstractmethod
+    def abs_path(self):
         return None
 
     @property
@@ -495,6 +505,11 @@ class InstrumentFileH5(ABC):
         :param kwargs:
         :return:
         '''
+
+        file_name = os.path.split(fout)[1]
+        self.attrs['file_name'] = file_name
+        self.path = fout
+        self.abs_path = os.path.abspath(fout)
 
         with h5py.File(fout, mode=mode) as h5out:
             h5out.attrs.update(self.attrs)
@@ -767,15 +782,15 @@ class SaxspointH5(InstrumentFileH5):
         self.attrs['abs_path'] = val
 
     @property
-    def transmitance(self):
-        '''Returns transmitance value for the data. Returns None, if not available'''
+    def transmittance(self):
+        '''Returns transmittance value for the data. Returns None, if not available'''
         try:
-            transmitance = float(self['entry/data/flux_exiting_sample']) / float(
+            transmittance = float(self['entry/data/flux_exiting_sample']) / float(
                 self['entry/data/flux_entering_sample'])
         except KeyError:
-            transmitance = None
+            transmittance = None
 
-        return transmitance
+        return transmittance
 
 
 def test_equal_Datasets():

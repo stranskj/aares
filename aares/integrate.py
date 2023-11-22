@@ -69,10 +69,10 @@ reduction
         .help = Value, to which all the frames are scaled. If None, value from the first frame is chosen in such a way, that the scale of that frame is 1. (not implemented yet)
     }
     
-    transmitance = None
+    transmittance = None
     .type = bool
     .expert_level = 0
-    .help = Normalize the data to transmitance, based on flux measurements. If None, applied if the flux data are available in the data.
+    .help = Normalize the data to transmittance, based on flux measurements. If None, applied if the flux data are available in the data.
     
     file_bin_masks = None
     .type = path
@@ -238,7 +238,7 @@ def list_integration_masks(q_bins, q_array, frame_mask=None):
     return list(q_masks)
 
 def integrate_file_by_frame(header, q_masks, q_bins, start_frame=1, prefix='frame', numdigit=None,
-                   nproc=None, scale=None, scale_transmitance=False, sep=" "):
+                   nproc=None, scale=None, scale_transmittance=False, sep=" "):
     """
     Integrates individual frames of the file
     :param header: File header
@@ -256,14 +256,14 @@ def integrate_file_by_frame(header, q_masks, q_bins, start_frame=1, prefix='fram
 
     aares.my_print('Reducing file: {}'.format(header.path))
     with h5z.FileH5Z(header.path) as h5f:
-        if scale_transmitance:
-            transmitance = header.transmitance
+        if scale_transmittance:
+            transmittance = header.transmittance
         else:
-            transmitance = 1.0
+            transmittance = 1.0
         for frame in h5f['entry/data/data'][:]:
             avr, std, num = aares.integrate.integrate_mp(frame, q_masks, nproc)
-            avr *= transmitance
-            std *= transmitance
+            avr *= transmittance
+            std *= transmittance
             if scale is not None:
                 frame_scale = scale / avr[-1]
                 avr = avr[:-1] * frame_scale
@@ -366,7 +366,7 @@ def process_file(header, file_out, frames=None, export=None, reduction = None,
                  bin_masks=None,
                  q_val=None,
                  scale=None,
-                 scale_transmitance=False,
+                 scale_transmittance=False,
                  error_model='3d',
                  nproc=None,
                  by_frame=False):
@@ -393,10 +393,10 @@ def process_file(header, file_out, frames=None, export=None, reduction = None,
         # std = std[:-1]
         num = num[:-1]
 
-    if scale_transmitance:
-        transmitance = header.transmitance
-        averages *= transmitance
-        stddev *= transmitance
+    if scale_transmittance:
+        transmittance = header.transmittance
+        averages *= transmittance
+        stddev *= transmittance
 
     error_model = reduction.error_model
     #pick of stddev
@@ -443,19 +443,19 @@ def integrate_group(group, data_dictionary, job_control=None, output=None, expor
                                      'of:\nintegrate.beam_normalize.real_space\nintegrate'
                                      '.beam_normalize.q_range')
 
-    if params.reduction.transmitance is None:
-        if all([data_dictionary[fi.path].transmitance is not None for fi in group.scope_extract.file]):
-            aares.my_print('Transmitance data found, performing the scaling.')
-            scale_transmitance = True
+    if params.reduction.transmittance is None:
+        if all([data_dictionary[fi.path].transmittance is not None for fi in group.scope_extract.file]):
+            aares.my_print('transmittance data found, performing the scaling.')
+            scale_transmittance = True
         else:
-            scale_transmitance = False
-            aares.my_print('Transmitance data not available')
+            scale_transmittance = False
+            aares.my_print('transmittance data not available')
     else:
-        scale_transmitance = params.reduction.transmitance
-        if scale_transmitance:
-            if not all([data_dictionary[fi.path].transmitance is not None for fi in group.scope_extract.file]):
-                logging.warning('The data in the group does not contain information for transmitance scaling. Switchin the scaling off.')
-                scale_transmitance = False
+        scale_transmittance = params.reduction.transmittance
+        if scale_transmittance:
+            if not all([data_dictionary[fi.path].transmittance is not None for fi in group.scope_extract.file]):
+                logging.warning('The data in the group does not contain information for transmittance scaling. Switchin the scaling off.')
+                scale_transmittance = False
   #  if not normalize_beam and params.mask.beamstop.semitransparent is not None: TODO: Check and think
   #      normalize_beam = True
   #      params.reduction.beam_normalize.real_space = [0, params.mask.beamstop.semitransparent]
@@ -508,7 +508,7 @@ def integrate_group(group, data_dictionary, job_control=None, output=None, expor
                               bin_masks=bin_masks,
                               q_val=bin_masks_obj.q_axis,
                               scale=params.reduction.beam_normalize.scale,
-                              scale_transmitance=scale_transmitance,
+                              scale_transmittance=scale_transmittance,
                               reduction=reduction,
                               nproc=job_control.threads,
                               by_frame=False
@@ -547,7 +547,7 @@ def integrate_group(group, data_dictionary, job_control=None, output=None, expor
                                      q_bins=bin_masks_obj.q_axis,
                                      prefix= fiout,
                                      scale=params.reduction.beam_normalize.scale,
-                                     scale_transmitance=scale_transmitance,
+                                     scale_transmittance=scale_transmittance,
                                      nproc=job_control.threads
                                       ))
             concurrent.futures.wait(jobs)
@@ -558,7 +558,7 @@ def integrate_group(group, data_dictionary, job_control=None, output=None, expor
    #                                q_masks=bin_masks,
    #                                q_bins=bin_masks_obj.q_axis,
    #                                scale=params.reduction.beam_normalize.scale,
-   #                                scale_transmitance=scale_transmitance,
+   #                                scale_transmittance=scale_transmittance,
    #                                nproc=job_control.threads,
    #
    #                                )
