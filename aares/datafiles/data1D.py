@@ -1,7 +1,9 @@
 import datetime
+import os.path
 
 import h5z, h5py
 import aares
+import numpy
 
 def Reduced1D_factory(base_class=h5z.SaxspointH5):
 
@@ -12,6 +14,12 @@ def Reduced1D_factory(base_class=h5z.SaxspointH5):
         self.attrs['HDF5_Version'] = h5z.hdf5_version
         self.attrs['creator'] = 'AAres {}'.format(aares.version)
         self.attrs['file_time'] = datetime.datetime.now().isoformat()
+        empty_arr = numpy.empty(0)
+        self.q_values = empty_arr
+        self.intensity = empty_arr
+        self.intensity_sigma = empty_arr
+        self.redundancy = empty_arr
+        self.scale = 1
 
     @staticmethod
     def is_type(val):
@@ -95,17 +103,49 @@ def Reduced1D_factory(base_class=h5z.SaxspointH5):
         dts.attrs['units'] = 'pixels'
         self['entry/processed/redundancy'] = dts
 
+    @property
+    def scale(self):
+        return self['entry/processed/scale'][0]
+
+    @scale.setter
+    def scale(self,val):
+        val_arr = numpy.array([val])
+        dts = h5z.DatasetH5(source_dataset=val_arr, name='scale')
+        dts.attrs['long_name'] = 'Scale factor applied to the original data. Usually derived from primary beam.'
+        self['entry/processed/scale'] = dts
+
+    @property
+    def parents(self):
+        return self['entry/data/parents']
+
+    @parents.setter
+    def parents(self, arr):
+        if isinstance(arr, str) or isinstance(arr, h5z.InstrumentFileH5):
+            arr = [arr]
+        arr_out = []
+        for parent in arr:
+            if isinstance(parent, str):
+                arr_out.append(parent)
+            elif isinstance(parent, h5z.InstrumentFileH5):
+                arr_out.append(parent.path)
+            else:
+                raise ValueError('Something unexpected in file name of a parent.') #TODO: Make it some more informative...
+
+        dts =  h5z.DatasetH5(source_dataset=numpy.array(arr_out, dtype='S'), name='parents')
+        self['entry/data/parents'] = dts
 
     cls_1D = type("Reduced1D", (base_class,),
                   {
-                      "__init__": __init__,
-                      "is_type":  is_type,
-                      "q_values": q_values,
-                      "q_value_units": q_value_units,
-                      "intensity": intensity,
+                      "__init__":        __init__,
+                      "is_type":         is_type,
+                      "q_values":        q_values,
+                      "q_value_units":   q_value_units,
+                      "intensity":       intensity,
                       "intensity_units": intensity_units,
                       "intensity_sigma": intensity_sigma,
-                      "redundancy": redundancy,
+                      "redundancy":      redundancy,
+                      "scale":           scale,
+                      "parents":         parents,
                   })
     return cls_1D
 
@@ -124,12 +164,16 @@ def test_Reduced1D():
     hd1.redundancy = arr
     hd1.q_value_units = "1/A"
     hd1.intensity_units= "cm^-2"
+    hd1.scale = 45.4678
+    hd1.parents=[fin, header]
     hd1.intensity
     hd1.intensity_sigma
     hd1.q_values
     hd1.redundancy
     hd1.q_value_units
     hd1.intensity_units
+    hd1.scale
+    hd1.parents
     hd1.write('AgBeh_826mm_reduced.h5')
 
     assert reduced1d.is_type('AgBeh_826mm_reduced.h5')
