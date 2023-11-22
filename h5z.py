@@ -607,8 +607,8 @@ class SaxspointH5(InstrumentFileH5):
                 out = True
             else:
                 logging.info('Proper name of the file creator is missing in the header.')
-                out = True
-        except KeyError:
+                out = True              #TODO: this needs a better solution...
+        except (KeyError, AttributeError):
             out = False
 
         return out

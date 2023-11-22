@@ -11,7 +11,36 @@ import freephil as phil
 import aares
 import h5z
 from aares import power as pwr
+import aares.datafiles.data1D
+from aares.datafiles.data1D import Reduced1D_meta
 #from aares.import_file import phil_core as import_phil
+
+data_file_types = {'SaxspointH5': h5z.SaxspointH5,
+                   #'Reduced1D': aares.datafiles.data1D.Reduced1D_meta,
+                   'Reduced1D': Reduced1D_meta
+                   }
+
+
+def get_file_type(fin):
+    '''
+    Returns file class suitable for the file
+    '''
+
+    for name, tp in data_file_types.items():
+        if tp.is_type(fin):
+            if name == 'Reduced1D':
+                base_type_name = aares.datafiles.data1D.Reduced1D_meta.base_class_name(fin)
+                return aares.datafiles.data1D.Reduced1D_factory(data_file_types[base_type_name])
+            else:
+                return tp
+    raise TypeError('Unknown file type')
+
+def read_file(path):
+    '''
+    Reads file using associtated class
+    '''
+    file_class = get_file_type(path)
+    return file_class(path)
 
 group_phil_str = '''
     name = None
@@ -871,3 +900,5 @@ class DataFilesCarrier:
         for item in input_group[self._master_group_name].values():
             header = h5z.SaxspointH5(item)
             self.files_dict[header.path] = header
+
+

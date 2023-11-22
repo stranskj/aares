@@ -4,6 +4,39 @@ import os.path
 import h5z, h5py
 import aares
 import numpy
+import logging
+
+class Reduced1D_meta:
+    @staticmethod
+    def is_type(val):
+
+        attributes = {}
+        if h5z.is_h5_file(val):
+            with h5z.FileH5Z(val, 'r') as fin:
+                attributes.update(fin.attrs)
+        elif isinstance(val, h5z.GroupH5) or isinstance(val, h5py.Group):
+            attributes.update(val.attrs)
+        else:
+            raise TypeError('Input should be h5py.Group-like object.')
+        try:
+            out = attributes['reduced']
+        except KeyError:
+            out = False
+
+        return out
+
+    @staticmethod
+    def base_class_name(fin_path):
+        try:
+            if h5z.is_h5_file(fin_path):
+                with h5z.FileH5Z(fin_path,'r') as fin:
+                    return fin.attrs['base_type']
+            elif isinstance(fin_path, h5z.GroupH5) or isinstance(fin_path, h5py.Group):
+                return fin_path.attrs['base_type']
+        except KeyError:
+            raise ValueError('This is not a Reduced1D file.')
+        else:
+            raise ValueError('This is not a Reduced1D file.')
 
 def Reduced1D_factory(base_class=h5z.SaxspointH5):
 
@@ -14,6 +47,7 @@ def Reduced1D_factory(base_class=h5z.SaxspointH5):
         self.attrs['HDF5_Version'] = h5z.hdf5_version
         self.attrs['creator'] = 'AAres {}'.format(aares.version)
         self.attrs['file_time'] = datetime.datetime.now().isoformat()
+        self.attrs['base_type'] = base_class.__name__
         empty_arr = numpy.empty(0)
         self.q_values = empty_arr
         self.intensity = empty_arr
@@ -33,7 +67,7 @@ def Reduced1D_factory(base_class=h5z.SaxspointH5):
         else:
             raise TypeError('Input should be h5py.Group-like object.')
         try:
-            out  = attributes['reduced']
+            out = attributes['reduced']
         except KeyError:
             out = False
 
@@ -116,7 +150,11 @@ def Reduced1D_factory(base_class=h5z.SaxspointH5):
 
     @property
     def parents(self):
-        return self['entry/data/parents']
+        try:
+            return self['entry/data/parents']
+        except KeyError:
+            logging.debug('File does not have any parents: {}'.format(self.path))
+            return None
 
     @parents.setter
     def parents(self, arr):
@@ -150,7 +188,7 @@ def Reduced1D_factory(base_class=h5z.SaxspointH5):
     return cls_1D
 
 
-def test_Reduced1D():
+def test_Reduced1D_write():
     fin = "../data/AgBeh_826mm.h5z"
     header = h5z.SaxspointH5(fin)
     reduced1d = Reduced1D_factory(type(header))
@@ -177,3 +215,7 @@ def test_Reduced1D():
     hd1.write('AgBeh_826mm_reduced.h5')
 
     assert reduced1d.is_type('AgBeh_826mm_reduced.h5')
+
+def test_Reduced1D_read():
+
+    assert Reduced1D_factory.is_type('AgBeh_826mm_reduced.h5')
