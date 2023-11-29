@@ -427,6 +427,7 @@ def process_file(header, file_out, frames=None, export=None, reduction = None,
     h5r_out.scale = frame_scale*transmittance
 
     h5r_out.write(file_out)
+    logging.debug('File {} reduced to file  {}.'.format(header.path, file_out))
 
     # aares.export.write_atsas(q_val, averages,stddev,
     #                          file_name=file_out,
@@ -533,11 +534,23 @@ def integrate_group(group, data_dictionary, job_control=None, output=None, expor
                               by_frame=False
                               )
 
-    files = [data_dictionary[fi.path] for fi in group.scope_extract.file]
-    files_out = [os.path.join(output.directory, fi.name + '.h5r')
-                 for fi in group.scope_extract.file]  # TODO: use info from export or so
+    #files = [data_dictionary[fi.path] for fi in group.scope_extract.file]
+    #frames = [ for fi in group.scope_extract.file]
 
-    frames = [fi.frames for fi in group.scope_extract.file]
+    files = []
+    files_out = []
+    frames = []
+    for fi in group.scope_extract.file:
+        files.append(data_dictionary[fi.path])
+
+        file_out_name = os.path.join(output.directory, fi.name + '.h5r') # TODO: use info from export or so
+        files_out.append(file_out_name)
+        fi.path = file_out_name
+
+        frames.append(fi.frames)
+
+
+
     aares.power.map_mp(process_partial,
                        files,
                        files_out,
@@ -952,41 +965,9 @@ class JobReduction(aares.Job):
                             reduction=self.params.reduction,
                             output=self.params.output)  # TODO: prepare job_control
 
-    # def __worker__(self):
-    #
-    #     if (((self.params.input is not None) and (self.params.input_files is not None)) or
-    #             ((self.params.input is None) and (self.params.input_files is None))):
-    #         raise aares.RuntimeErrorUser(
-    #             'Exactly one of the parameters has to be set:\n\tinput\n\tinput_files')
-    #
-    #     if (self.params.input_files is not None) and (self.params.output is not None):
-    #         logging.warning(
-    #             'Output keyword is ignored, definitions from {} are used instead.'.format(
-    #                 self.params.input_files))
-    #
-    #     to_process = []
-    #     if self.params.input_files is not None:
-    #         imported_files = aares.datafiles.DataFilesCarrier(file_phil=self.params.input_files,
-    #                                                           mainphil=phil_core)
-    #         for group in imported_files.file_groups:
-    #             if group.q_space is None:
-    #                 group.q_space = group.name + '.q_space.h5a'
-    #
-    #             to_process.append(
-    #                 (group.q_space, ArrayQ(imported_files.files_dict[group.geometry])))
-    #     elif self.params.input is not None:
-    #         if self.params.output is None:
-    #             self.params.output = self.params.input + '.q_space.h5a'
-    #         aares.my_print('Reading file header...')
-    #         to_process.append((self.params.output, ArrayQ(self.params.input)))
-    #     else:
-    #         raise AssertionError
-    #
-    #     aares.my_print('Performing Q-transformation')
-    #     for fout, arrQ in to_process:
-    #         arrQ.calculate_q()
-    #         aares.my_print('Writing: {}'.format(fout))
-    #         arrQ.write_to_file(fout)
+        # The output file names are updated with in processing of the group.
+        imported_files.write_groups(file_out=self.params.output.files)
+        aares.my_print('\nList of reduced files written to: {}'.format(self.params.output.files))
 
 
 def test():
