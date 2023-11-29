@@ -46,3 +46,4 @@ def test_get_file_type():
 def test_read_file():
     header = aares.datafiles.read_file('AgBeh_826mm_reduced.h5')
     assert header.attrs['reduced']
+    assert header.intensity[6] == 6

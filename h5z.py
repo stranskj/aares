@@ -496,6 +496,7 @@ class InstrumentFileH5(ABC):
             # for key, val in h5z.attrs.items():
             #    self.attrs[key] = val
             self._h5 = GroupH5(h5z, exclude=self.skip_entries)
+            pass
 
     def write(self, fout, mode='w', skipped=False, **kwargs):
         '''

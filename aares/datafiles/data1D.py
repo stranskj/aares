@@ -43,17 +43,14 @@ def Reduced1D_factory(base_class=h5z.SaxspointH5):
     assert issubclass(base_class, h5z.InstrumentFileH5)
     def __init__(self, path):
         super(type(self), self).__init__(path)
-        self.attrs['reduced'] = True
-        self.attrs['HDF5_Version'] = h5z.hdf5_version
-        self.attrs['creator'] = 'AAres {}'.format(aares.version)
-        self.attrs['file_time'] = datetime.datetime.now().isoformat()
-        self.attrs['base_type'] = base_class.__name__
-        empty_arr = numpy.empty(0)
-        self.q_values = empty_arr
-        self.intensity = empty_arr
-        self.intensity_sigma = empty_arr
-        self.redundancy = empty_arr
-        self.scale = 1
+
+#        self.skip_entries.append('entry/processed/intensity')
+#         empty_arr = numpy.empty(0)
+#         self.q_values = empty_arr
+#         self.intensity = empty_arr
+#         self.intensity_sigma = empty_arr
+#         self.redundancy = empty_arr
+#         self.scale = 1
 
     @staticmethod
     def is_type(val):
@@ -90,7 +87,7 @@ def Reduced1D_factory(base_class=h5z.SaxspointH5):
     @q_value_units.setter
     def q_value_units(self, val):
         if val not in ['1/nm', '1/A']:
-            raise ValueError('Invalid unit type. Allowd: 1/nm, 1/A.  Given: {}'.format(val))
+            raise ValueError('Invalid unit type. Allowed: 1/nm, 1/A.  Given: {}'.format(val))
         self['entry/processed/q_values'].attrs['units'] = val
 
     @property
@@ -172,6 +169,23 @@ def Reduced1D_factory(base_class=h5z.SaxspointH5):
         dts =  h5z.DatasetH5(source_dataset=numpy.array(arr_out, dtype='S'), name='parents')
         self['entry/data/parents'] = dts
 
+    def update_attributes(self):
+        '''
+        Updates file attributes
+        '''
+        self.attrs['reduced'] = True
+        self.attrs['HDF5_Version'] = h5z.hdf5_version
+        self.attrs['creator'] = 'AAres {}'.format(aares.version)
+        self.attrs['file_time'] = datetime.datetime.now().isoformat()
+        self.attrs['base_type'] = base_class.__name__
+
+    def write(self, *args, **kwargs):
+        '''
+        Writes the file
+        '''
+        self.update_attributes()
+        super(type(self), self).write(*args, **kwargs)
+
     cls_1D = type("Reduced1D", (base_class,),
                   {
                       "__init__":        __init__,
@@ -184,6 +198,8 @@ def Reduced1D_factory(base_class=h5z.SaxspointH5):
                       "redundancy":      redundancy,
                       "scale":           scale,
                       "parents":         parents,
+                      "update_attributes": update_attributes,
+                      "write":            write,
                   })
     return cls_1D
 
