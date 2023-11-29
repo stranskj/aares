@@ -133,6 +133,9 @@ phil_job_core = phil.parse('''
     }
    
     output {
+        files = reduced.fls
+        .type = path
+        .help = List of reduced files
         directory = 'reduced'
         .type = path
         .help = Output folder for the processed data
@@ -392,11 +395,15 @@ def process_file(header, file_out, frames=None, export=None, reduction = None,
         # avr = avr[:-1]
         # std = std[:-1]
         num = num[:-1]
+    else:
+        frame_scale = 1.0
 
     if scale_transmittance:
         transmittance = header.transmittance
         averages *= transmittance
         stddev *= transmittance
+    else:
+        transmittance = 1.0
 
     error_model = reduction.error_model
     #pick of stddev
@@ -409,9 +416,21 @@ def process_file(header, file_out, frames=None, export=None, reduction = None,
     else:
         raise aares.RuntimeErrorUser('Unknown error model: {}'.format(error_model))
 
-    aares.export.write_atsas(q_val, averages,stddev,
-                             file_name=file_out,
-                             header=['# {}\n'.format(header.path)])
+    h5r_type = aares.datafiles.data1D.Reduced1D_factory(type(header))
+    h5r_out = h5r_type(header._h5)
+    h5r_out.q_values = q_val
+    h5r_out.q_units = "1/nm"  #TODO: Let user pick, or guess it from wavelenght or something
+    h5r_out.intensity = averages
+    h5r_out.intensity_sigma = stddev
+    h5r_out.redundancy = num
+    h5r_out.parents  = [header.path]
+    h5r_out.scale = frame_scale*transmittance
+
+    h5r_out.write(file_out)
+
+    # aares.export.write_atsas(q_val, averages,stddev,
+    #                          file_name=file_out,
+    #                          header=['# {}\n'.format(header.path)])
 
 
 def integrate_group(group, data_dictionary, job_control=None, output=None, export=None,
@@ -443,7 +462,7 @@ def integrate_group(group, data_dictionary, job_control=None, output=None, expor
                                      'of:\nintegrate.beam_normalize.real_space\nintegrate'
                                      '.beam_normalize.q_range')
 
-    if params.reduction.transmittance is None:
+    if params.reduction.transmittance is None: #TODO: The transmittance availability detection does not work properly, if Flux is NaN
         if all([data_dictionary[fi.path].transmittance is not None for fi in group.scope_extract.file]):
             aares.my_print('transmittance data found, performing the scaling.')
             scale_transmittance = True
@@ -515,7 +534,7 @@ def integrate_group(group, data_dictionary, job_control=None, output=None, expor
                               )
 
     files = [data_dictionary[fi.path] for fi in group.scope_extract.file]
-    files_out = [os.path.join(output.directory, fi.name + '.dat')
+    files_out = [os.path.join(output.directory, fi.name + '.h5r')
                  for fi in group.scope_extract.file]  # TODO: use info from export or so
 
     frames = [fi.frames for fi in group.scope_extract.file]
