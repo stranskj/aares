@@ -118,19 +118,7 @@ phil_job_core = phil.parse('''
     .help = PNG file with mask (output from aares.mask)
     }
     
-    export {
-        separator = comma *space semicolon
-        .type = choice
-        .optional = False
-        .help = Separator to be used in the output file
-        file_name = original *name sample
-        .type = choice
-        .optional = False
-        .help = "How should be derived file name for the exported data. 
-                'original' - same as the source file name; 
-                'name' - same as the name in the AAres imported files;
-                'sample' - as sample name specified in data file header. A number is preceeded to guarantee uniquenes. No order is guaranteed."
-    }
+    include scope aares.common.phil_export
    
     output {
         files = reduced.fls
@@ -948,6 +936,7 @@ class JobReduction(aares.Job):
 
             if self.params.output.input_files is None:
                 self.params.output.input_files = 'binned.fls'
+            imported_files.header_file = None
             imported_files.write_groups(file_out=self.params.output.input_files)
 
         else:

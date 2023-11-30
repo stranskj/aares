@@ -36,6 +36,22 @@ input_files = None
 .type = path
 ''')
 
+phil_export = phil.parse('''
+export {
+    separator = comma *space semicolon
+    .type = choice
+    .optional = False
+    .help = Separator to be used in the output file
+    file_name = original *name sample
+    .type = choice
+    .optional = False
+    .help = "How should be derived file name for the exported data. 
+            'original' - same as the source file name; 
+            'name' - same as the name in the AAres imported files;
+            'sample' - as sample name specified in data file header. A number is preceeded to guarantee uniquenes. No order is guaranteed."
+}
+''')
+
 
 class RuntimeErrorUser(RuntimeError):
     '''

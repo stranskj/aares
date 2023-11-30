@@ -10,6 +10,8 @@ import logging
 
 import numpy as np
 
+import aares.datafiles
+
 phil_job_control = phil.parse('''
 job_control {
     nproc = None
@@ -220,7 +222,7 @@ def get_headers_dict(file_list, nproc=None, sort=None):
     with (concurrent.futures.ProcessPoolExecutor(max_workers=nproc) as ex,
           tqdm(total=len(file_list)) as pbar):
         pbar.update(0)
-        jobs = {ex.submit(mp_worker, h5z.SaxspointH5, fi) : fi for fi in file_list }
+        jobs = {ex.submit(mp_worker, aares.datafiles.read_file, fi) : fi for fi in file_list }
         #headers = list(ex.map(mp_worker, [h5z.SaxspointH5] * len(file_list), file_list))
         headers_out = {}
         for job in concurrent.futures.as_completed(jobs):
