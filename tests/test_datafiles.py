@@ -47,3 +47,13 @@ def test_read_file():
     header = aares.datafiles.read_file('AgBeh_826mm_reduced.h5')
     assert header.attrs['reduced']
     assert header.intensity[6] == 6
+
+def test_Reduced1D_pickle():
+    import pickle
+    header = aares.datafiles.read_file('AgBeh_826mm_reduced.h5')
+   # header = aares.datafiles.read_file('../data/AgBeh_826mm.h5z')
+    pckl = pickle.dumps(header)
+    unpck_header = pickle.loads(pckl)
+
+    assert unpck_header.attrs['reduced']
+    assert unpck_header.intensity[6] == 6
