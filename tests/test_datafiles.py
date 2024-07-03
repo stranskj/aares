@@ -57,3 +57,8 @@ def test_Reduced1D_pickle():
 
     assert unpck_header.attrs['reduced']
     assert unpck_header.intensity[6] == 6
+
+def test_get_headers_1D():
+    import aares.power
+    headers = aares.power.get_headers_dict(['reduced/1_SDD_SDD_793mm_010Frames.h5r', 'reduced/2_SDD.001_SDD.001_793mm_090Frames.h5r'])
+    assert len(headers) == 2

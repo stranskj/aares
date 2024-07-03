@@ -11,6 +11,7 @@ import logging
 import numpy as np
 
 import aares.datafiles
+import pickle
 
 phil_job_control = phil.parse('''
 job_control {
@@ -219,6 +220,7 @@ def get_headers_dict(file_list, nproc=None, sort=None):
 
     import h5z
     from tqdm import tqdm
+
     with (concurrent.futures.ProcessPoolExecutor(max_workers=nproc) as ex,
           tqdm(total=len(file_list)) as pbar):
         pbar.update(0)
@@ -227,7 +229,11 @@ def get_headers_dict(file_list, nproc=None, sort=None):
         headers_out = {}
         for job in concurrent.futures.as_completed(jobs):
             fi = jobs[job]
-            headers_out[fi] = job.result()
+            try:
+                headers_out[fi] = job.result()
+            except pickle.PickleError:   # A bit dirty hack for files loaded using class factory
+                logging.debug('Processing unpicklable file...')
+                headers_out[fi] = aares.datafiles.read_file(fi)
             pbar.update(1)
 
 
