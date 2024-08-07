@@ -11,6 +11,7 @@ Creating masks
 @contact:    jan.stransky@ibt.cas.cz
 @deffield    updated: Updated
 """
+import pathlib
 
 import aares
 import logging
@@ -237,6 +238,8 @@ def read_mask_from_image(image_in, channel='A', threshold=128, invert=None):
     :param invert: Invert the mask
     :return:
     '''
+
+    image_in = aares.path_normalize(image_in)
 
     try:
         with PIL.Image.open(image_in) as img_in:
