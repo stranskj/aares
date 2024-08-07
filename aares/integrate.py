@@ -136,6 +136,7 @@ phil_job_core = phil.parse('''
         bin_redundancy = redundancy.dat
         .type = path
         .help = Number of pixels per resolution 
+        export = True
     }
 
     ''' + phil_core_str + '''
@@ -417,9 +418,11 @@ def process_file(header, file_out, frames=None, export=None, reduction = None,
     h5r_out.write(file_out)
     logging.debug('File {} reduced to file  {}.'.format(header.path, file_out))
 
-    # aares.export.write_atsas(q_val, averages,stddev,
-    #                          file_name=file_out,
-    #                          header=['# {}\n'.format(header.path)])
+    if export is not None:
+        aares.export.write_atsas(q_val, averages,stddev,
+                                  file_name=export,
+                                  header=['# {}\n'.format(header.path)])
+        logging.debug('File {} exported to file  {}.'.format(header.path, export))
 
 
 def integrate_group(group, data_dictionary, job_control=None, output=None, export=None,
@@ -512,7 +515,7 @@ def integrate_group(group, data_dictionary, job_control=None, output=None, expor
     aares.my_print('Reducing files of {}:'.format(group.scope_extract.name))
     from functools import partial
     process_partial = partial(process_file,
-                              export=export,
+                              #export=export,
                               bin_masks=bin_masks,
                               q_val=bin_masks_obj.q_axis,
                               scale=params.reduction.beam_normalize.scale,
@@ -528,6 +531,7 @@ def integrate_group(group, data_dictionary, job_control=None, output=None, expor
     files = []
     files_out = []
     frames = []
+    export_finames = []
     for fi in group.scope_extract.file:
         files.append(data_dictionary[fi.path])
 
@@ -536,15 +540,22 @@ def integrate_group(group, data_dictionary, job_control=None, output=None, expor
         fi.path = file_out_name
 
         frames.append(fi.frames)
-
-
+        if output.export:
+            export_finames.append(os.path.join(output.directory, fi.name + '.dat'))
+        else:
+            export_finames.append(None)
 
     aares.power.map_mp(process_partial,
                        files,
                        files_out,
                        frames,
+                       export_finames,
                        nchunks=job_control.jobs
                        )
+
+    if output.export:
+        aares.my_print('Files exported to ASCII format.')
+
     if reduction.by_frame:
         aares.my_print('Reducing files by individual frames:')
         if output.by_frame is None:
