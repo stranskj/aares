@@ -84,7 +84,7 @@ reduction
     .type = choice
     .help = 'Model used to estimate measurement errors for intensity.'
             ' 3d - Standard deviation of intensity at all pixels with given q (within g-bin).'
-            ' pixel - standard deviation at pixel across all frames followed by error propagation.'
+            ' pixel - standard deviation at pixel across all frames followed by error propagation. (disabled now)'
             ' poisson - standard deviation from Poisson distribution (e.g. square root of intensity).'
     
     empty_skip = True
@@ -94,6 +94,10 @@ reduction
     by_frame = False
     .type = bool
     .help = Integrate also individual frames  
+
+    pixel_mask_per_frame = False
+    .type = bool
+    .help = Mask out pixels with negative values for each frame individually.
 
 }     
 '''
@@ -238,7 +242,7 @@ def list_integration_masks(q_bins, q_array, frame_mask=None):
     return list(q_masks)
 
 def integrate_file_by_frame(header, q_masks, q_bins, start_frame=1, prefix='frame', numdigit=None,
-                   nproc=None, scale=None, scale_transmitance=False, sep=" "):
+                   nproc=None, scale=None, scale_transmitance=False, sep=" ", non_negative=False):
     """
     Integrates individual frames of the file
     :param header: File header
@@ -261,7 +265,7 @@ def integrate_file_by_frame(header, q_masks, q_bins, start_frame=1, prefix='fram
         else:
             transmitance = 1.0
         for frame in h5f['entry/data/data'][:]:
-            avr, std, num = aares.integrate.integrate_mp(frame, q_masks, nproc)
+            avr, std, num, not_masked = aares.integrate.integrate_mp(frame, q_masks, nproc, non_negative)
             avr *= transmitance
             std *= transmitance
             if scale is not None:
@@ -276,11 +280,12 @@ def integrate_file_by_frame(header, q_masks, q_bins, start_frame=1, prefix='fram
                                      header=['# {} {}'.format(header.path,
                                                               str(start_frame).zfill(numdigit))])
             start_frame += 1
-def integrate(frame_arr, bin_masks):
+def integrate(frame_arr, bin_masks, non_negative = False):
     '''
     Calculate averages and stddevs across frames in all bins
     :param frame_arr: data; 3d np.array
     :param bin_masks: bin masks
+    :param non_negative: If true, filter out negative values from calculation
     :return: np.array, np. array, np.array: averages, stddevs, number of points in bin
     '''
 
@@ -301,7 +306,9 @@ def integrate(frame_arr, bin_masks):
         binval = frame_arr[:, binm]
         not_masked = binval<0
         num_not_masked.append(numpy.sum(not_masked))
- #       binval = binval[binval >= 0]  # TODO: performance hit needs checking; do we need it, e.g. isn't it masked? Maybe we could do it on whole file? Or warn, that there is an masking issue?
+        if non_negative:
+            binval = binval[binval >= 0]
+
         if binval.size <= 0:
             averages.append(numpy.nan)
             stdev_3d.append(numpy.nan)
@@ -324,15 +331,15 @@ def integrate(frame_arr, bin_masks):
     #    averages = map(numpy.average, [frame_arr]*len(bin_masks), int_masks)
     #    stdev = map(numpy.std,  [frame_arr] * len(bin_masks), int_masks)
 
-    logging.debug('Number of unmasked pixels: {}'.format(numpy.sum(num_not_masked)))
+#logging.debug('Number of unmasked pixels: {}'.format(numpy.sum(num_not_masked)))
     errors = numpy.array([stdev_3d,
                           stdev_sqrtI,
                           # stdev_by_pixel,
                          ])
-    return numpy.array(averages), errors, numpy.array(num)#, numpy.sum(num_not_masked)
+    return numpy.array(averages), errors, numpy.array(num), num_not_masked
 
 
-def integrate_mp(frame_arr, bin_masks, nproc=None):
+def integrate_mp(frame_arr, bin_masks, nproc=None, non_negative=False):
     '''
     Calculate averages and stddevs across frames in all bins, parallel in multiple chunks
     :param frame_arr: data; 3d np.array
@@ -348,7 +355,8 @@ def integrate_mp(frame_arr, bin_masks, nproc=None):
 
     with concurrent.futures.ThreadPoolExecutor(nproc) as ex:
         results = ex.map(integrate, [frame_arr] * nproc,
-                         pwr.chunks(bin_masks, int(len(bin_masks) / nproc) + 1))
+                         pwr.chunks(bin_masks, int(len(bin_masks) / nproc) + 1),
+                         [non_negative]*nproc)
         # results = pwr.map_th(integrate, [frame_arr]*len(bin_masks), bin_masks, nchunks=nproc)
         resl = list(results)
       #  res = numpy.concatenate(resl, axis=1)
@@ -356,10 +364,11 @@ def integrate_mp(frame_arr, bin_masks, nproc=None):
         averages = numpy.concatenate([res[0] for res in resl])
         stdev = numpy.concatenate([res[1] for res in resl], axis=1)
         num = numpy.concatenate([res[2] for res in resl])
+        num_not_masked = numpy.concatenate([res[3] for res in resl])
 
   #      print('Number of unmasked pixels: {}'.format(numpy.sum(res[3, :])))
 
-    return averages, stdev, num
+    return averages, stdev, num, num_not_masked
 
 
 def process_file(header, file_out, frames=None, export=None, reduction = None,
@@ -369,7 +378,8 @@ def process_file(header, file_out, frames=None, export=None, reduction = None,
                  scale_transmitance=False,
                  error_model='3d',
                  nproc=None,
-                 by_frame=False):
+                 by_frame=False,
+                 non_negative=False):
 
     aares.my_print(header.path)
 
@@ -384,7 +394,7 @@ def process_file(header, file_out, frames=None, export=None, reduction = None,
         except IndexError as err:
             raise aares.RuntimeErrorUser(repr(err)+'\nError while processing file: {}\nCould not select specified frames. Note that frame indices are 0-based.'.format(header.path))
 
-    averages, stddev, num = integrate_mp(data, bin_masks=bin_masks, nproc=nproc)
+    averages, stddev, num, non_masked = integrate_mp(data, bin_masks=bin_masks, nproc=nproc, non_negative=non_negative)
     if scale is not None:
         frame_scale = scale / averages[-1]
         averages = averages[:-1] * frame_scale
@@ -408,6 +418,9 @@ def process_file(header, file_out, frames=None, export=None, reduction = None,
         stddev = stddev[1]
     else:
         raise aares.RuntimeErrorUser('Unknown error model: {}'.format(error_model))
+
+    if numpy.sum(non_masked) > 0:
+        logging.warning('Unmasked pixels with negative values encountered: {}'.format(numpy.sum(non_masked)))
 
     aares.export.write_atsas(q_val, averages,stddev,
                              file_name=file_out,
@@ -487,8 +500,10 @@ def integrate_group(group, data_dictionary, job_control=None, output=None, expor
         bin_masks = numpy.append(bin_masks_obj.bin_masks, [beam_mask], axis=0)
 
         if params.reduction.beam_normalize.scale is None:
-            scale, err, num = integrate(data_dictionary[group.file[0].path].data, numpy.array([beam_mask]))
+            scale, err, num, non_masked = integrate(data_dictionary[group.file[0].path].data, numpy.array([beam_mask]))
             params.reduction.beam_normalize.scale = scale[0]
+            if numpy.sum(non_masked) > 0:
+                logging.warning('Problematic pixels in the area used for normalization.')
             aares.my_print('Normalization scale set to: {:.3f}'.format(scale[0]))
     else:
         bin_masks = bin_masks_obj.bin_masks
@@ -511,7 +526,8 @@ def integrate_group(group, data_dictionary, job_control=None, output=None, expor
                               scale_transmitance=scale_transmitance,
                               reduction=reduction,
                               nproc=job_control.threads,
-                              by_frame=False
+                              by_frame=False,
+                              non_negative=params.reduction.pixel_mask_per_frame,
                               )
 
     files = [data_dictionary[fi.path] for fi in group.scope_extract.file]
@@ -548,7 +564,8 @@ def integrate_group(group, data_dictionary, job_control=None, output=None, expor
                                      prefix= fiout,
                                      scale=params.reduction.beam_normalize.scale,
                                      scale_transmitance=scale_transmitance,
-                                     nproc=job_control.threads
+                                     nproc=job_control.threads,
+                                     non_negative=params.reduction.pixel_mask_per_frame
                                       ))
             concurrent.futures.wait(jobs)
   #      integrate_file_by_frame(header,q_masks=bin_masks, q_bins=q_val, prefix=)
@@ -1003,7 +1020,7 @@ def test():
 
     with h5z.FileH5Z(fin) as h5f:
         frames = h5f['entry/data/data'][:]
-        avr, std, num = integrate_mp(frames, bincls2.bin_masks)
+        avr, std, num, non_masked = integrate_mp(frames, bincls2.bin_masks)
     print(time.time() - t0)
 
     with open('data_826.dat', 'w') as fout:
