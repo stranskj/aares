@@ -11,6 +11,7 @@ Angular reduction
 @contact:    jan.stransky@ibt.cas.cz
 @deffield    updated: Updated
 """
+import shutil
 
 import h5z
 import h5py
@@ -810,7 +811,12 @@ class ReductionBins(h5z.SaxspointH5):
     def qmax(self):
         return max(self.q_axis)
 
-
+    def draw2d(self, output_dir='q_images', clear=True):
+        if os.path.isdir(output_dir) and clear:
+            shutil.rmtree(output_dir)
+        os.mkdir(output_dir)
+        output_names = [os.path.join(output_dir,'q{:.4f}.png'.format(q)) for q in self.q_axis]
+        pwr.map_mp(aares.mask.draw_mask, self.bin_masks, output_names, [False]*len(output_names))
 
 
 class JobReduction(aares.Job):
@@ -1055,6 +1061,11 @@ def test():
     with h5z.FileH5Z(fin) as fid:
         pass
 
+
+def test_bins_draw2d():
+    bins = ReductionBins('group001.bins.h5a')
+    bins.draw2d()
+    assert os.path.isdir('q_images')
 
 def main():
     # test()
