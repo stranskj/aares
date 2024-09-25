@@ -30,6 +30,7 @@ import os, logging
 import freephil as phil
 import tqdm
 
+
 prog_short_description = 'Performs data reduction from 2D to 1D.'
 
 phil_core_str = '''
@@ -1066,6 +1067,27 @@ def test_bins_draw2d():
     bins = ReductionBins('group001.bins.h5a')
     bins.draw2d()
     assert os.path.isdir('q_images')
+
+def draw_bins():
+    #TODO: re do this properly, ideally after lib-bin refactorisation
+
+    import sys
+    aares.my_print("AAres draw bins")
+
+    fin = sys.argv[1]
+
+    if not ReductionBins.is_type(fin):
+        logging.error('This is not file with Q-bins. Search for suffix ".bins.h5a"')
+        sys.exit(1)
+
+    bins = ReductionBins(fin)
+    bins.draw2d()
+
+    aares.my_print('Images of individual bins are draw in folder "q_images".')
+    aares.my_print('\nFinished.')
+
+    sys.exit(0)
+
 
 def main():
     # test()
