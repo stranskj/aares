@@ -497,6 +497,8 @@ def integrate_group(group, data_dictionary, job_control=None, output=None, expor
             arrQ=arrQ.q_length,
             pixel_size=data_dictionary[group.file[0].path].pixel_size[0])
 
+        aares.mask.draw_mask(beam_mask, output='normalization_mask_{}.png'.format(group.name), invert=False)
+
         bin_masks = numpy.append(bin_masks_obj.bin_masks, [beam_mask], axis=0)
 
         if params.reduction.beam_normalize.scale is None:
@@ -807,6 +809,8 @@ class ReductionBins(h5z.SaxspointH5):
     @property
     def qmax(self):
         return max(self.q_axis)
+
+
 
 
 class JobReduction(aares.Job):
