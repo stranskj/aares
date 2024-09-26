@@ -731,6 +731,12 @@ class SaxspointH5(InstrumentFileH5):
         detector_offset_x = self['entry/instrument/detector/height'].item()
         return detector_offset_x, detector_offset_y
 
+    @detector_offset.setter
+    def detector_offset(self, corrXY):
+        assert len(corrXY) == 2
+        self['entry/instrument/detector/x_translation'][0] = corrXY[1] # Y
+        self['entry/instrument/detector/height'][0] = corrXY[0] # X
+
     @property
     def beam_center_px(self):
         """
@@ -745,8 +751,13 @@ class SaxspointH5(InstrumentFileH5):
         return x, y
 
     @beam_center_px.setter
-    def beam_center_px(self, val):
-        raise NotImplementedError
+    def beam_center_px(self, corrXY):
+        assert len(corrXY) == 2
+        pix = self.pixel_size
+        self.detector_offset = (-corrXY[0] * pix[0],
+                                -corrXY[1] * pix[1])
+
+        #raise NotImplementedError
 
     @property
     def meridional_angle(self):
