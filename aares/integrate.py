@@ -69,6 +69,7 @@ reduction
         .type = float
         .expert_level=1
         .help = Value, to which all the frames are scaled. If None, value from the first frame is chosen in such a way, that the scale of that frame is 1. (not implemented yet)
+      
     }
     
     transmitance = None
@@ -101,6 +102,10 @@ reduction
     .type = bool
     .help = Mask out pixels with negative values for each frame individually.
 
+    binning_only = False
+    .type = bool
+    .help = Perform only binning and write the bin masks.
+    .expert_level=2 
 }     
 '''
 
@@ -511,6 +516,11 @@ def integrate_group(group, data_dictionary, job_control=None, output=None, expor
             aares.my_print('Normalization scale set to: {:.3f}'.format(scale[0]))
     else:
         bin_masks = bin_masks_obj.bin_masks
+
+    if reduction.binning_only:
+        logging.debug('\nRequested to stop after binning.')
+        return
+
     aares.my_print('Using error model: {}\n'.format(reduction.error_model))
 
     aares.create_directory(output.directory)
