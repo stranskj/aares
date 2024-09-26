@@ -135,6 +135,15 @@ def create_directory(dir, stop=False):
         if stop:
             raise RuntimeErrorUser('Directory already exists.')
 
+def path_normalize(path_in):
+    '''Converts path to the path understandable by working OS'''
+    if '\\' in path_in:
+        path_out = path_in.replace('\\', os.sep)
+    else:
+        path_out = path_in
+
+    return os.path.normpath(path_out)
+
 def slice_array(arr, intervals='[:]', axis=None):
     '''Slicing an array using parametric inputs (1D).
 

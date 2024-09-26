@@ -12,6 +12,7 @@ Data statistics
 @deffield    updated: Updated
 """
 
+import aares.export
 import h5z
 import h5py
 import numpy
@@ -313,47 +314,16 @@ def rolling_window(array, window=(0,), asteps=None, wsteps=None, axes=None, toen
 
     return numpy.lib.stride_tricks.as_strided(array, shape=new_shape, strides=new_strides)
 
-def test():
+def redundancy_in_bin(bins):
+    '''Returns number of pixels in each bin'''
+   # assert type(bins, aares.integrate.ReductionBins)
+    return [bn.sum() for bn in bins.bin_masks]
 
-    #fin = '../data/10x60s_826mm_010Frames.h5'
-    fin = '../data/buffer_16x60.h5z'
-    # fin = '../data/W_826mm_005Frames.h5z'
-    #fin = '../data/AgBeh_826mm.h5z'
+def export_redundancy(bins, fiout, separator=" "):
+    '''Writes redundancy'''
+    reduncies = redundancy_in_bin(bins)
+    masked = len(reduncies)*['nan']
 
-    h5f = h5z.SaxspointH5(fin)
-    frames = h5f.data[:]
+    aares.export.write_atsas(bins.q_axis, reduncies, masked, fiout, header=['Number of pixels in indvidual q-shells',
+                                                                            'q{sep}used{sep}masked'.format(sep=separator)])
 
- #   paded = numpy.pad(frames[0],pad_width=2, mode='constant',constant_values=-2)
- #   paded[paded<0]= numpy.nan
-  #  slwnd = rolling_window(paded,(5,5))
-
-   # avr = numpy.average(slwnd,axis=(2,3))
-
- #   avr = sliding_average_frame(frames[0],window=5)
-    import aares.integrate
-    import aares.q_transformation
-    print('Reading...')
-    arrQ = aares.q_transformation.transform_detector_radial_q(h5f)
-    qvals, qbins = aares.integrate.prepare_bins(arrQ,qmin=0.1,qmax=2)
-    print('Getting CC12')
-    cc12_many = []
-    cc12_w_many = []
-    for i in range(10):
-        cc12, cc12_w = set_cc12(frames[0],qbins,10)
-        cc12_many.append(cc12)
-        cc12_w_many.append(cc12_w)
-
-    cc12_a = numpy.nanmean(cc12_many)
-    cc12_w_a = numpy.nanmean(cc12_w_many,axis=0)
-    cc12_w_s = numpy.nanstd(cc12_w_many, axis=0)
-
-    with open('cc12.dat','w') as fout:
-        for q, cc, s in zip(numpy.array_split(qvals,10), cc12_w_a, cc12_w_s):
-            fout.write('{} {} {}\n'.format(q[-1], cc,s))
-    print(cc12)
-
-def main():
-    test()
-
-if __name__ == '__main__':
-    main()

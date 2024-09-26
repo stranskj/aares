@@ -193,9 +193,12 @@ def get_headers(file_list, nproc=None, sort=None):
     """
     Returns list of headers in SaxspointH5 format, sorted by time
     """
-    import h5z
-    with concurrent.futures.ProcessPoolExecutor(nproc) as ex:
-        headers = list(ex.map(mp_worker, [h5z.SaxspointH5] * len(file_list), file_list))
+    #import h5z
+    #with concurrent.futures.ProcessPoolExecutor(nproc) as ex:
+    #    headers = list(ex.map(mp_worker, [h5z.SaxspointH5] * len(file_list), file_list))
+
+    headers_dict = get_headers_dict(file_list, nproc=nproc)
+    headers = [headers_dict[fi] for fi in file_list ]
 
     if sort is not None:
         headers.sort(key=lambda x: x.attrs[sort])
@@ -212,4 +215,18 @@ def get_headers_dict(file_list, nproc=None, sort=None):
     :return:
     '''
 
-    return {fi: hd for fi, hd in zip(file_list, get_headers(file_list, nproc=nproc, sort=None))}
+    import h5z
+    from tqdm import tqdm
+    with (concurrent.futures.ProcessPoolExecutor(max_workers=nproc) as ex,
+          tqdm(total=len(file_list)) as pbar):
+        pbar.update(0)
+        jobs = {ex.submit(mp_worker, h5z.SaxspointH5, fi) : fi for fi in file_list }
+        #headers = list(ex.map(mp_worker, [h5z.SaxspointH5] * len(file_list), file_list))
+        headers_out = {}
+        for job in concurrent.futures.as_completed(jobs):
+            fi = jobs[job]
+            headers_out[fi] = job.result()
+            pbar.update(1)
+
+
+    return headers_out#{fi: hd for fi, hd in zip(file_list, get_headers(file_list, nproc=nproc, sort=None))}

@@ -155,7 +155,7 @@ def rotate_by_axis_matrix(axis, angle):
     return numpy.array(
         [[cT + ux * ux * (1 - cT), ux * uy * (1 - cT) - uz * sT, ux * uz * (1 - cT) + uy * sT],
          [uy * ux * (1 - cT) + uz * sT, cT + uy * uy * (1 - cT), uy * uz * (1 - cT) - ux * sT],
-         [uz * uz * (1 - cT) - uy * sT, uz * uy * (1 - cT) + ux * sT, cT + uz * uz * (1 - cT)]])
+         [uz * ux * (1 - cT) - uy * sT, uz * uy * (1 - cT) + ux * sT, cT + uz * uz * (1 - cT)]])
 
 
 def translate_by_vector(vector, distance):

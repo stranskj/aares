@@ -11,6 +11,7 @@ Angular reduction
 @contact:    jan.stransky@ibt.cas.cz
 @deffield    updated: Updated
 """
+import shutil
 
 import h5z
 import h5py
@@ -22,10 +23,13 @@ import aares.datafiles
 import aares.q_transformation
 import aares.mask
 import aares.export
+import aares.statistics
 
 import concurrent.futures
 import os, logging
 import freephil as phil
+import tqdm
+
 
 prog_short_description = 'Performs data reduction from 2D to 1D.'
 
@@ -65,6 +69,16 @@ reduction
         .type = float
         .expert_level=1
         .help = Value, to which all the frames are scaled. If None, value from the first frame is chosen in such a way, that the scale of that frame is 1. (not implemented yet)
+      
+        mask = None
+        .type = path
+        .expert_level = 2
+        .help = Specify the area of the detector, which is used as to normalize the beam variation 
+        
+        invert_mask = True
+        .type = bool
+        .expert_level = 2
+        .help = Invert the mask read from the file. The default value works with the mask written by aares.integrate.
     }
     
     transmitance = None
@@ -77,17 +91,30 @@ reduction
     .help = File containing binning and reduction masks (output of previous aares.integrate).
     .expert_level=1
     
-    error_model = *3d pixel poisson
+    #error_model = *3d poisson pixel
+    error_model = *3d poisson 
     .type = choice
     .help = 'Model used to estimate measurement errors for intensity.'
             ' 3d - Standard deviation of intensity at all pixels with given q (within g-bin).'
-            ' pixel - standard deviation at pixel across all frames followed by error propagation.'
+            ' pixel - standard deviation at pixel across all frames followed by error propagation. (disabled now)'
             ' poisson - standard deviation from Poisson distribution (e.g. square root of intensity).'
     
     empty_skip = True
     .type = bool
     .help = If the bin contains zero pixels, it is ignored.
 
+    by_frame = False
+    .type = bool
+    .help = Integrate also individual frames  
+
+    pixel_mask_per_frame = False
+    .type = bool
+    .help = Mask out pixels with negative values for each frame individually.
+
+    binning_only = False
+    .type = bool
+    .help = Perform only binning and write the bin masks.
+    .expert_level=2 
 }     
 '''
 
@@ -124,15 +151,20 @@ phil_job_core = phil.parse('''
                 'name' - same as the name in the AAres imported files;
                 'sample' - as sample name specified in data file header. A number is preceeded to guarantee uniquenes. No order is guaranteed."
     }
-    
-    
+   
     output {
         directory = 'reduced'
         .type = path
         .help = Output folder for the processed data
+        by_frame = None
+        .type = path
+        .help = Output folder for processing of individual frames. If set, the processing of individual frames will be performed. Automatically determined, if left blank.
         input_files = binned.fls
         .type = path
         .help = Updated descriptor of the input files.
+        bin_redundancy = redundancy.dat
+        .type = path
+        .help = Number of pixels per resolution 
     }
 
     ''' + phil_core_str + '''
@@ -225,12 +257,51 @@ def list_integration_masks(q_bins, q_array, frame_mask=None):
 
     return list(q_masks)
 
+def integrate_file_by_frame(header, q_masks, q_bins, start_frame=1, prefix='frame', numdigit=None,
+                   nproc=None, scale=None, scale_transmitance=False, sep=" ", non_negative=False):
+    """
+    Integrates individual frames of the file
+    :param header: File header
+    :type header: h5z.SaxspointH5
+    :param q_masks: Binning masks
+    :param prefix: Prefix for the file output
+    :param start_frame: Numbering of the first frame
+    :param nproc: Number of CPUs to be used
+    :param sep: Column separator in the output
+    :return:
+"""
 
-def integrate(frame_arr, bin_masks):
+    if numdigit is None:
+        numdigit = int(math.log10(len(header['entry/data/time']))) + 1
+
+    aares.my_print('Reducing file: {}'.format(header.path))
+    with h5z.FileH5Z(header.path) as h5f:
+        if scale_transmitance:
+            transmitance = header.transmitance
+        else:
+            transmitance = 1.0
+        for frame in h5f['entry/data/data'][:]:
+            avr, std, num, not_masked = aares.integrate.integrate_mp(frame, q_masks, nproc, non_negative)
+            avr *= transmitance
+            std *= transmitance
+            if scale is not None:
+                frame_scale = scale / avr[-1]
+                avr = avr[:-1] * frame_scale
+                std = std[:,:-1] * abs(frame_scale)
+                # avr = avr[:-1]
+                # std = std[:-1]
+                num = num[:-1]
+            aares.export.write_atsas(q_bins, avr, std[1], #TODO: pick error model
+                                     file_name=prefix + str(start_frame).zfill(numdigit) + '.dat',
+                                     header=['# {} {}'.format(header.path,
+                                                              str(start_frame).zfill(numdigit))])
+            start_frame += 1
+def integrate(frame_arr, bin_masks, non_negative = False):
     '''
     Calculate averages and stddevs across frames in all bins
     :param frame_arr: data; 3d np.array
     :param bin_masks: bin masks
+    :param non_negative: If true, filter out negative values from calculation
     :return: np.array, np. array, np.array: averages, stddevs, number of points in bin
     '''
 
@@ -241,9 +312,9 @@ def integrate(frame_arr, bin_masks):
     stdev_3d = []
     num = []
     num_not_masked = []
-    frame_mask = numpy.any(bin_masks,axis=0)
-    pixel_stdev = numpy.nanstd(frame_arr, axis=0, dtype='float64')
-    stdev_by_pixel = []
+    #frame_mask = numpy.any(bin_masks,axis=0)
+#    pixel_stdev = numpy.nanstd(frame_arr, axis=0, dtype='float64')
+#    stdev_by_pixel = []
     stdev_sqrtI = []
 
     for binm in bin_masks:
@@ -251,17 +322,19 @@ def integrate(frame_arr, bin_masks):
         binval = frame_arr[:, binm]
         not_masked = binval<0
         num_not_masked.append(numpy.sum(not_masked))
- #       binval = binval[binval >= 0]  # TODO: performance hit needs checking; do we need it, e.g. isn't it masked? Maybe we could do it on whole file? Or warn, that there is an masking issue?
+        if non_negative:
+            binval = binval[binval >= 0]
+
         if binval.size <= 0:
             averages.append(numpy.nan)
             stdev_3d.append(numpy.nan)
-            stdev_by_pixel.append(numpy.nan)
+    #        stdev_by_pixel.append(numpy.nan)
             stdev_sqrtI.append(numpy.nan)
         else:
 
             averages.append(numpy.nanmean(binval, dtype='float64'))
             stdev_3d.append(numpy.nanstd(binval, dtype='float64') / math.sqrt(binval.size))
-            stdev_by_pixel.append(numpy.nanmean(pixel_stdev[binm], dtype='float64')/math.sqrt(binval.size))
+     #       stdev_by_pixel.append(numpy.nanmean(pixel_stdev[binm], dtype='float64')/math.sqrt(binval.size))
             stdev_sqrtI.append(numpy.sqrt(numpy.abs(averages[-1]))/math.sqrt(binval.size))
 
         num.append(binval.size)
@@ -274,14 +347,15 @@ def integrate(frame_arr, bin_masks):
     #    averages = map(numpy.average, [frame_arr]*len(bin_masks), int_masks)
     #    stdev = map(numpy.std,  [frame_arr] * len(bin_masks), int_masks)
 
-    logging.debug('Number of unmasked pixels: {}'.format(numpy.sum(num_not_masked)))
+#logging.debug('Number of unmasked pixels: {}'.format(numpy.sum(num_not_masked)))
     errors = numpy.array([stdev_3d,
-                          stdev_by_pixel,
-                          stdev_sqrtI])
-    return numpy.array(averages), errors, numpy.array(num)#, numpy.sum(num_not_masked)
+                          stdev_sqrtI,
+                          # stdev_by_pixel,
+                         ])
+    return numpy.array(averages), errors, numpy.array(num), num_not_masked
 
 
-def integrate_mp(frame_arr, bin_masks, nproc=None):
+def integrate_mp(frame_arr, bin_masks, nproc=None, non_negative=False):
     '''
     Calculate averages and stddevs across frames in all bins, parallel in multiple chunks
     :param frame_arr: data; 3d np.array
@@ -297,7 +371,8 @@ def integrate_mp(frame_arr, bin_masks, nproc=None):
 
     with concurrent.futures.ThreadPoolExecutor(nproc) as ex:
         results = ex.map(integrate, [frame_arr] * nproc,
-                         pwr.chunks(bin_masks, int(len(bin_masks) / nproc) + 1))
+                         pwr.chunks(bin_masks, int(len(bin_masks) / nproc) + 1),
+                         [non_negative]*nproc)
         # results = pwr.map_th(integrate, [frame_arr]*len(bin_masks), bin_masks, nchunks=nproc)
         resl = list(results)
       #  res = numpy.concatenate(resl, axis=1)
@@ -305,10 +380,11 @@ def integrate_mp(frame_arr, bin_masks, nproc=None):
         averages = numpy.concatenate([res[0] for res in resl])
         stdev = numpy.concatenate([res[1] for res in resl], axis=1)
         num = numpy.concatenate([res[2] for res in resl])
+        num_not_masked = numpy.concatenate([res[3] for res in resl])
 
   #      print('Number of unmasked pixels: {}'.format(numpy.sum(res[3, :])))
 
-    return averages, stdev, num
+    return averages, stdev, num, num_not_masked
 
 
 def process_file(header, file_out, frames=None, export=None, reduction = None,
@@ -317,12 +393,16 @@ def process_file(header, file_out, frames=None, export=None, reduction = None,
                  scale=None,
                  scale_transmitance=False,
                  error_model='3d',
-                 nproc=None):
+                 nproc=None,
+                 by_frame=False,
+                 non_negative=False):
 
     aares.my_print(header.path)
 
     if frames is None:
         data = header.data
+    elif isinstance(frames,int):
+        data = header.data[frames]
     else:
         try:
             data = aares.slice_array(header.data, intervals=frames, axis=0)
@@ -330,7 +410,7 @@ def process_file(header, file_out, frames=None, export=None, reduction = None,
         except IndexError as err:
             raise aares.RuntimeErrorUser(repr(err)+'\nError while processing file: {}\nCould not select specified frames. Note that frame indices are 0-based.'.format(header.path))
 
-    averages, stddev, num = integrate_mp(data, bin_masks=bin_masks, nproc=nproc)
+    averages, stddev, num, non_masked = integrate_mp(data, bin_masks=bin_masks, nproc=nproc, non_negative=non_negative)
     if scale is not None:
         frame_scale = scale / averages[-1]
         averages = averages[:-1] * frame_scale
@@ -349,18 +429,22 @@ def process_file(header, file_out, frames=None, export=None, reduction = None,
     if error_model == '3d':
         stddev = stddev[0]
     elif error_model == 'pixel':
-        stddev = stddev[1]
-    elif error_model == 'poisson':
         stddev = stddev[2]
+    elif error_model == 'poisson':
+        stddev = stddev[1]
     else:
         raise aares.RuntimeErrorUser('Unknown error model: {}'.format(error_model))
+
+    if numpy.sum(non_masked) > 0:
+        logging.warning('Unmasked pixels with negative values encountered: {}'.format(numpy.sum(non_masked)))
 
     aares.export.write_atsas(q_val, averages,stddev,
                              file_name=file_out,
                              header=['# {}\n'.format(header.path)])
 
 
-def integrate_group(group, data_dictionary, job_control=None, output=None, export=None, reduction=None):
+def integrate_group(group, data_dictionary, job_control=None, output=None, export=None,
+                    reduction=None):
     '''
     Integrates group of files
 
@@ -374,13 +458,15 @@ def integrate_group(group, data_dictionary, job_control=None, output=None, expor
     if job_control is None:
         job_control = pwr.phil_job_control.extract().job_control
         job_control.threads, job_control.jobs = pwr.get_cpu_distribution(job_control)
-        aares.my_print('Using {} threads per {} jobs.'.format(job_control.threads, job_control.jobs))
+    aares.my_print('Using {} threads per {} jobs.'.format(job_control.threads, job_control.jobs))
 
     params = group.group_phil
 
     normalize_beam = (params.reduction.beam_normalize.real_space is not None
                       or
-                      params.reduction.beam_normalize.q_range is not None)
+                      params.reduction.beam_normalize.q_range is not None
+                      or
+                      params.reduction.beam_normalize.mask is not None)
     if normalize_beam and (params.reduction.beam_normalize.real_space is not None
                            and
                            params.reduction.beam_normalize.q_range is not None):
@@ -411,25 +497,48 @@ def integrate_group(group, data_dictionary, job_control=None, output=None, expor
 
     aares.my_print('Reading bin masks: {}'.format(params.reduction.file_bin_masks))
     bin_masks_obj = ReductionBins(params.reduction.file_bin_masks)
+
+    # Write the pixel redundancies, a bit MEH placement
+    fiout_redundancies = os.path.splitext(output.bin_redundancy)[0] + '_' + group.name + \
+                         os.path.splitext(output.bin_redundancy)[1]
+    aares.statistics.export_redundancy(bin_masks_obj, fiout_redundancies, separator=export.separator)
+    aares.my_print('Pixel redundancy written to: {}'.format(fiout_redundancies))
+
     aares.my_print('Reading Q-space data: {}'.format(group.scope_extract.q_space))
     arrQ = aares.q_transformation.ArrayQ(group.scope_extract.q_space)
     if normalize_beam:
         aares.my_print('Normalization to beam fluctuation will be performed.')
 
-        beam_mask = beam_bin_mask(
-            real_space=params.reduction.beam_normalize.real_space,
-            q_range=params.reduction.beam_normalize.q_range,
-            arrQ=arrQ.q_length,
-            pixel_size=data_dictionary[group.file[0].path].pixel_size[0])
+        if params.reduction.beam_normalize.mask is not None:
+            aares.my_print('Reading the beam normalization area from: {}'.format(params.reduction.beam_normalize.mask))
+            beam_mask = aares.mask.read_mask_from_image(params.reduction.beam_normalize.mask,
+                                                        channel='A',
+                                                        invert=params.reduction.beam_normalize.invert_mask)
 
+        else:
+            beam_mask = beam_bin_mask(
+                real_space=params.reduction.beam_normalize.real_space,
+                q_range=params.reduction.beam_normalize.q_range,
+                arrQ=arrQ.q_length,
+                pixel_size=data_dictionary[group.file[0].path].pixel_size[0])
+
+            aares.mask.draw_mask(beam_mask, output='normalization_mask_{}.png'.format(group.name), invert=False)
+        aares.my_print('Number of pixels to be used for beam normalization: {}'.format(beam_mask[beam_mask].size))
         bin_masks = numpy.append(bin_masks_obj.bin_masks, [beam_mask], axis=0)
 
         if params.reduction.beam_normalize.scale is None:
-            scale, err, num = integrate(data_dictionary[group.file[0].path].data, numpy.array([beam_mask]))
+            scale, err, num, non_masked = integrate(data_dictionary[group.file[0].path].data, numpy.array([beam_mask]))
             params.reduction.beam_normalize.scale = scale[0]
+            if numpy.sum(non_masked) > 0:
+                logging.warning('Problematic pixels in the area used for normalization.')
             aares.my_print('Normalization scale set to: {:.3f}'.format(scale[0]))
     else:
         bin_masks = bin_masks_obj.bin_masks
+
+    if reduction.binning_only:
+        logging.debug('\nRequested to stop after binning.')
+        return
+
     aares.my_print('Using error model: {}\n'.format(reduction.error_model))
 
     aares.create_directory(output.directory)
@@ -448,7 +557,9 @@ def integrate_group(group, data_dictionary, job_control=None, output=None, expor
                               scale=params.reduction.beam_normalize.scale,
                               scale_transmitance=scale_transmitance,
                               reduction=reduction,
-                              nproc=job_control.threads
+                              nproc=job_control.threads,
+                              by_frame=False,
+                              non_negative=params.reduction.pixel_mask_per_frame,
                               )
 
     files = [data_dictionary[fi.path] for fi in group.scope_extract.file]
@@ -462,6 +573,50 @@ def integrate_group(group, data_dictionary, job_control=None, output=None, expor
                        frames,
                        nchunks=job_control.jobs
                        )
+    if reduction.by_frame:
+        aares.my_print('Reducing files by individual frames:')
+        if output.by_frame is None:
+            output.by_frame = output.directory+"_by_frame"
+            logging.info('Writting individual frames to: {}'.format(output.by_frame))
+        if not os.path.exists(output.by_frame):
+            logging.info('Creating directory: {}'.format(output.by_frame))
+            os.mkdir(output.by_frame)
+        if not os.path.isdir(output.by_frame):
+            raise aares.RuntimeErrorUser('Path is not a directory: {}'.format(output.my_frame))
+
+        files_out = [os.path.join(output.by_frame, os.path.splitext(fi.name)[0] + '_')
+                     for fi in group.scope_extract.file]  # TODO: use info from export or so
+
+        with concurrent.futures.ProcessPoolExecutor(max_workers=job_control.jobs) as ex:
+            jobs = []
+            for fi, fiout in zip(files, files_out):
+                jobs.append(ex.submit(integrate_file_by_frame, fi,
+                                     q_masks=bin_masks,
+                                     q_bins=bin_masks_obj.q_axis,
+                                     prefix= fiout,
+                                     scale=params.reduction.beam_normalize.scale,
+                                     scale_transmitance=scale_transmitance,
+                                     nproc=job_control.threads,
+                                     non_negative=params.reduction.pixel_mask_per_frame
+                                      ))
+            concurrent.futures.wait(jobs)
+  #      integrate_file_by_frame(header,q_masks=bin_masks, q_bins=q_val, prefix=)
+
+   #      process_partial = partial(integrate_file_by_frame,
+   # #                               export=export,
+   #                                q_masks=bin_masks,
+   #                                q_bins=bin_masks_obj.q_axis,
+   #                                scale=params.reduction.beam_normalize.scale,
+   #                                scale_transmitance=scale_transmitance,
+   #                                nproc=job_control.threads,
+   #
+   #                                )
+   #      aares.power.map_mp(process_partial,
+   #                         files,
+   #                         files_out,
+   #                         #frames,
+   #                         nchunks=job_control.jobs
+   #                         )
 
 
 def prepare_bins(arrQ, qmin=None, qmax=None, bins=None, frame_mask=None, skip_empty=True):
@@ -685,6 +840,13 @@ class ReductionBins(h5z.SaxspointH5):
     def qmax(self):
         return max(self.q_axis)
 
+    def draw2d(self, output_dir='q_images', clear=True):
+        if os.path.isdir(output_dir) and clear:
+            shutil.rmtree(output_dir)
+        os.mkdir(output_dir)
+        output_names = [os.path.join(output_dir,'q{:.4f}.png'.format(q)) for q in self.q_axis]
+        pwr.map_mp(aares.mask.draw_mask, self.bin_masks, output_names, [False]*len(output_names))
+
 
 class JobReduction(aares.Job):
 
@@ -702,6 +864,7 @@ class JobReduction(aares.Job):
         pass
 
     def __process_unhandled__(self):
+
         for param in self.unhandled:
             if aares.datafiles.is_fls(param):
                 self.params.input_files = param
@@ -739,7 +902,9 @@ class JobReduction(aares.Job):
         #     pass
 
     def __worker__(self):
-
+        if self.params.output.by_frame is not None:
+            self.params.reduction.by_frame = True
+            logging.info('Output directory for by-frame reduction provided, performing the by-frame reduction.')
         if self.params.input_files is not None:
             imported_files = aares.datafiles.DataFilesCarrier(file_phil=self.params.input_files,
                                                               mainphil=phil_core)
@@ -768,8 +933,7 @@ class JobReduction(aares.Job):
 
                 if group.group_phil.reduction.file_bin_masks is not None \
                         and os.path.isfile(group.group_phil.reduction.file_bin_masks) \
-                        and (
-                        not group_write):  # TODO: only if binnig parameters did not change.... No skipped when other like "beamstop" used
+                        and (not group_write):  # TODO: only if binnig parameters did not change.... No skipped when other like "beamstop" used
                     aares.my_print(
                         'Reading from file {}...'.format(group.group_phil.reduction.file_bin_masks))
                     group_bins = ReductionBins(group.group_phil.reduction.file_bin_masks)
@@ -814,12 +978,13 @@ class JobReduction(aares.Job):
             raise aares.RuntimeWarningUser(
                 'Not implemented yet, please use aares.import -> aares.q_transformation')
 
+
       #  aares.my_print('Using error model: {}\n'.format(self.params.reduction.error_model))
         for group in imported_files.file_groups:
             aares.my_print('Reducing files in group {}:'.format(group.name))
 
             integrate_group(group, imported_files.files_dict,
-                            job_control=None,
+                            job_control=self.params.job_control,
                             export=self.params.export,
                             reduction=self.params.reduction,
                             output=self.params.output)  # TODO: prepare job_control
@@ -894,7 +1059,7 @@ def test():
 
     with h5z.FileH5Z(fin) as h5f:
         frames = h5f['entry/data/data'][:]
-        avr, std, num = integrate_mp(frames, bincls2.bin_masks)
+        avr, std, num, non_masked = integrate_mp(frames, bincls2.bin_masks)
     print(time.time() - t0)
 
     with open('data_826.dat', 'w') as fout:
@@ -924,6 +1089,32 @@ def test():
 
     with h5z.FileH5Z(fin) as fid:
         pass
+
+
+def test_bins_draw2d():
+    bins = ReductionBins('group001.bins.h5a')
+    bins.draw2d()
+    assert os.path.isdir('q_images')
+
+def draw_bins():
+    #TODO: re do this properly, ideally after lib-bin refactorisation
+
+    import sys
+    aares.my_print("AAres draw bins")
+
+    fin = sys.argv[1]
+
+    if not ReductionBins.is_type(fin):
+        logging.error('This is not file with Q-bins. Search for suffix ".bins.h5a"')
+        sys.exit(1)
+
+    bins = ReductionBins(fin)
+    bins.draw2d()
+
+    aares.my_print('Images of individual bins are draw in folder "q_images".')
+    aares.my_print('\nFinished.')
+
+    sys.exit(0)
 
 
 def main():

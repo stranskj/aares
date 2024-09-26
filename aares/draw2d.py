@@ -13,6 +13,7 @@ Draw frame
 """
 import concurrent.futures
 import logging
+import multiprocessing
 
 import aares
 import sys,os
@@ -30,6 +31,7 @@ import matplotlib.cm
 import h5z
 import aares.power as pwr
 import aares.datafiles
+from tqdm import tqdm
 
 
 phil_core = phil.parse("""
@@ -64,6 +66,10 @@ color_map = *jet hot
 log_scale = False
 .type = bool
 .help = Put the data on logarithmic scale. Values of min and max are on the logscale too.
+
+nproc = 0
+.type = int
+.help = Number of processes  to be used. When 0, set to number of CPU cores.
 
 """)
 
@@ -112,11 +118,11 @@ def draw_file(file_in, output=None, params=None):
 
     if not h5z.is_h5_file(file_in):
         raise aares.RuntimeErrorUser('Unsupported file type: {}'.format(file_in))
-    aares.my_print('Reading file...')
+    logging.info('Reading file...')
     header = h5z.SaxspointH5(file_in)
     if params.log_scale:
         frame = numpy.nanmean(header.data[:], axis=0)
-        aares.my_print('Putting data on a logarithmic scale...')
+        logging.info('Putting data on a logarithmic scale...')
         print(numpy.min(frame + 1))
         print(numpy.max(frame + 1))
         frame[frame < 0] = 0
@@ -151,11 +157,11 @@ def draw(frame, fiout, Imax= '2*median', Imin=0, cmap='jet', by_frame=False):
         Imax = float(Imax)
 
     except ValueError:
-        aares.my_print('\nDetermining thresholds....')
+        logging.info('\nDetermining thresholds....')
         mean = numpy.nanmean(frame, axis=0)
         Imin, Imax = get_treasholds(mean, Imax, Imin)
 
-    aares.my_print('''Used parameters:
+    logging.info('''Used parameters:
     min: {min:.1f}
     max: {max:.1f}'''.format(min=Imin, max=Imax))
 
@@ -241,12 +247,32 @@ class JobDraw2D(aares.Job):
             fls = aares.datafiles.DataFilesCarrier(file_phil=self.params.input,mainphil=self.system_phil)
             out_dir = os.path.splitext(self.params.output)[0]
             aares.create_directory(out_dir)
-            for name in fls.files(key='name'):
-                fi_path = fls.get_file_scope(name).path
-                aares.my_print('\nDrawing: {}'.format(name))
-                draw_file(fi_path,
-                          output=os.path.join(out_dir,name+'.png'),
-                          params=self.params)
+            if self.params.nproc == 0:
+                self.params.nproc = multiprocessing.cpu_count()
+            aares.my_print('Using {} processors.'.format(self.params.nproc))
+            with (concurrent.futures.ProcessPoolExecutor(self.params.nproc) as ex,
+                  tqdm(total=len(fls)) as pbar):
+                jobs = {}
+                try:
+                    for name in fls.files(key='name'):
+                        fi_path = fls.get_file_scope(name).path
+                       # aares.my_print('\nDrawing: {}'.format(name))
+                        jobs[ex.submit(draw_file,
+                                              fi_path,
+                                              output=os.path.join(out_dir,name+'.png'),
+                                              params=self.params)] = name
+                        # draw_file(fi_path,
+                        #           output=os.path.join(out_dir,name+'.png'),
+                        #           params=self.params)
+                    for job in concurrent.futures.as_completed(jobs):
+                        logging.info('File drawn: {}'.format(jobs[job]))
+                        pbar.update(1)
+
+                except KeyboardInterrupt:
+                    print('Stopping...')
+                    for job in jobs:
+                        job.cancel()
+                    raise KeyboardInterrupt
         else:
             raise aares.RuntimeErrorUser('Unsupported file type: {}'.format(self.params.input))
 

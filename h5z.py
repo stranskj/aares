@@ -800,6 +800,14 @@ class SaxspointH5(InstrumentFileH5):
         """
         return self['entry/instrument/detector/time']
 
+    @property
+    def number_of_frames(self):
+        """
+        Number of frames in the file
+        """
+
+        return len(self.time_offset)
+
     @time_offset.setter
     def time_offset(self, val):
         self['entry/instrument/detector/time'] = DatasetH5(source_dataset=val,name='time')
