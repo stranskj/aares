@@ -70,6 +70,15 @@ reduction
         .expert_level=1
         .help = Value, to which all the frames are scaled. If None, value from the first frame is chosen in such a way, that the scale of that frame is 1. (not implemented yet)
       
+        mask = None
+        .type = path
+        .expert_level = 2
+        .help = Specify the area of the detector, which is used as to normalize the beam variation 
+        
+        invert_mask = True
+        .type = bool
+        .expert_level = 2
+        .help = Invert the mask read from the file. The default value works with the mask written by aares.integrate.
     }
     
     transmitance = None
@@ -455,7 +464,9 @@ def integrate_group(group, data_dictionary, job_control=None, output=None, expor
 
     normalize_beam = (params.reduction.beam_normalize.real_space is not None
                       or
-                      params.reduction.beam_normalize.q_range is not None)
+                      params.reduction.beam_normalize.q_range is not None
+                      or
+                      params.reduction.beam_normalize.mask is not None)
     if normalize_beam and (params.reduction.beam_normalize.real_space is not None
                            and
                            params.reduction.beam_normalize.q_range is not None):
@@ -498,14 +509,21 @@ def integrate_group(group, data_dictionary, job_control=None, output=None, expor
     if normalize_beam:
         aares.my_print('Normalization to beam fluctuation will be performed.')
 
-        beam_mask = beam_bin_mask(
-            real_space=params.reduction.beam_normalize.real_space,
-            q_range=params.reduction.beam_normalize.q_range,
-            arrQ=arrQ.q_length,
-            pixel_size=data_dictionary[group.file[0].path].pixel_size[0])
+        if params.reduction.beam_normalize.mask is not None:
+            aares.my_print('Reading the beam normalization area from: {}'.format(params.reduction.beam_normalize.mask))
+            beam_mask = aares.mask.read_mask_from_image(params.reduction.beam_normalize.mask,
+                                                        channel='A',
+                                                        invert=params.reduction.beam_normalize.invert_mask)
 
-        aares.mask.draw_mask(beam_mask, output='normalization_mask_{}.png'.format(group.name), invert=False)
+        else:
+            beam_mask = beam_bin_mask(
+                real_space=params.reduction.beam_normalize.real_space,
+                q_range=params.reduction.beam_normalize.q_range,
+                arrQ=arrQ.q_length,
+                pixel_size=data_dictionary[group.file[0].path].pixel_size[0])
 
+            aares.mask.draw_mask(beam_mask, output='normalization_mask_{}.png'.format(group.name), invert=False)
+        aares.my_print('Number of pixels to be used for beam normalization: {}'.format(beam_mask[beam_mask].size))
         bin_masks = numpy.append(bin_masks_obj.bin_masks, [beam_mask], axis=0)
 
         if params.reduction.beam_normalize.scale is None:
