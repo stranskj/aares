@@ -1,0 +1,51 @@
+[build-system]
+requires = [
+  "setuptools >= 40.9.0",
+  "setuptools-scm",
+  "wheel",
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "AAres"
+authors = [{name = "Jan Stránský", email = "jan.stransky@ibt.cas.cz"}]
+dynamic = ["version"]
+description = "Another Angular Reduction for SAXS"
+readme = "README.md"
+requires-python = ">=3.9"
+keywords = ["saxs", "data processing", "data reduction"]
+license = {text = "GNU GPL 3"}
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: GNU GPL v3",
+  "Operating System :: OS Independent",
+  "Private :: Do Not Upload"
+]
+dependencies = [
+  "dateparser",
+  "h5py",
+  "numpy",
+  "matplotlib",
+  "freephil",
+  "pillow",
+  "tqdm",
+]
+
+[tool.setuptools]
+packages = ["aares"]
+py-modules = ["h5z"]
+
+[tool.setuptools.dynamic]
+version = {attr = "aares.version.version"}
+
+[project.scripts]
+  "aares" = "aares.__main__:main"
+  "aares.integrate" = "aares.integrate:main"
+  "aares.mask" = "aares.mask:main"
+  "aares.import" = "aares.import_file:main"
+  "aares.sec" = "aares.sec:main"
+  "aares.draw2d" = "aares.draw2d:main"
+  "aares.q_transform" = "aares.q_transformation:main"
+  "aares.plot" = "aares.plot:main"
+  "aares.merge" = "aares.merge:main"
+  "aares.draw2d.bins" = "aares.integrate:draw_bins"
