@@ -1,0 +1,3 @@
+[submodule "gitlab.ibt"]
+	path = wiki
+	url = git@gitlab.ibt:stranskj/aares.wiki.git
