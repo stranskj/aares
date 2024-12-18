@@ -1,6 +1,8 @@
 import datetime
 import os.path
 
+from numpy import dtype
+
 import h5z, h5py
 import aares
 import numpy
@@ -185,6 +187,19 @@ def Reduced1D_factory(base_class=h5z.SaxspointH5):
         self.attrs['file_time'] = datetime.datetime.now().isoformat()
         self.attrs['base_type'] = base_class.__name__
 
+    def add_process(self, name=None, description=None):
+        '''
+        Adds NXcanSAS compatible NXprocess
+        '''
+
+        proc = h5z.GroupH5(name='process')
+        proc.attrs['canSAS_class'] = 'SASprocess'
+        proc.attrs['NX_class'] = 'NXprocess'
+        if name is not None:
+            proc['name'] = h5z.DatasetH5(source_dataset=numpy.array(name, dtype='S'), name='name')
+        if description is not None:
+            proc['description'] = h5z.DatasetH5(source_dataset=numpy.array(description, dtype='S'), name='description')
+
     def write(self, *args, **kwargs):
         '''
         Writes the file
@@ -205,7 +220,8 @@ def Reduced1D_factory(base_class=h5z.SaxspointH5):
                       "scale":           scale,
                       "parents":         parents,
                       "update_attributes": update_attributes,
-                      "write":            write,
+                      "write":           write,
+                      "add_process":     add_process,
                   })
     return cls_1D
 

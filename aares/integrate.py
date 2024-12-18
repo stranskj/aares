@@ -414,6 +414,7 @@ def process_file(header, file_out, frames=None, export=None, reduction = None,
     h5r_out.redundancy = num
     h5r_out.parents  = [header.path]
     h5r_out.scale = frame_scale*transmittance
+    h5r_out.add_process(name='reduction', description='Data are radially and per pixel averaged.')
 
     h5r_out.write(file_out)
     logging.debug('File {} reduced to file  {}.'.format(header.path, file_out))
