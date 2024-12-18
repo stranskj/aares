@@ -71,79 +71,85 @@ def Reduced1D_factory(base_class=h5z.SaxspointH5):
         return out
     @property
     def q_values(self):
-        return self['entry/processed/q_values']
+        return self['entry/data/Q']
 
     @q_values.setter
     def q_values(self, val):
-        dts = h5z.DatasetH5(source_dataset=val, name='q_values')
+        dts = h5z.DatasetH5(source_dataset=val, name='Q')
         dts.attrs['long_name'] = 'Coordinate in reciprocal space'
         dts.attrs['units'] = 'Unknown'
-        self['entry/processed/q_values'] = dts
+        dts.attrs['resolution_description'] = 'Bin'
+        self['entry/data/Q'] = dts
 
     @property
     def q_value_units(self):
-        return self['entry/processed/q_values'].attrs['units']
+        return self['entry/data/Q'].attrs['units']
 
     @q_value_units.setter
     def q_value_units(self, val):
-        if val not in ['1/nm', '1/A']:
-            raise ValueError('Invalid unit type. Allowed: 1/nm, 1/A.  Given: {}'.format(val))
-        self['entry/processed/q_values'].attrs['units'] = val
+        if val not in ['1/nm', '1/angstrom', '1/m']:
+            raise ValueError('Invalid unit type. Allowed: 1/nm, 1/angstrom, 1/m.  Given: {}'.format(val))
+        self['entry/data/Q'].attrs['units'] = val
 
     @property
     def intensity(self):
-        return self['entry/processed/intensity']
+        return self['entry/data/I']
 
     @intensity.setter
     def intensity(self, val):
-        dts = h5z.DatasetH5(source_dataset=val, name='intensity')
+        dts = h5z.DatasetH5(source_dataset=val, name='I')
         dts.attrs['long_name'] = 'Scattering intensity'
-        dts.attrs['units'] = 'a.u.'
-        self['entry/processed/intensity'] = dts
+        dts.attrs['units'] = 'arbitrary'
+        dts.attrs['uncertainities']='Idev'
+        self['entry/data/I'] = dts
 
 
     @property
     def intensity_units(self):
-        return self['entry/processed/intensity'].attrs['units']
+        return self['entry/data/I'].attrs['units']
 
     @intensity_units.setter
     def intensity_units(self, val):
-#        if val not in ['1/nm',  '1/A']:
-#            raise ValueError('Invalid unit type. Allowd: 1/nm, 1/A.  Given: {}'.format(val))
-        self['entry/processed/intensity'].attrs['units'] = val
+        if val not in ['1/m',  '1/cm', 'arbitrary']:
+            raise ValueError('Invalid unit type. Allowd: 1/m, 1/cm, arbitrary.  Given: {}'.format(val))
+        self['entry/data/I'].attrs['units'] = val
+        try:
+            self['entry/data/Idev'].attrs['units'] = val
+        except KeyError:
+            logging.debug('Idev entry in the file does not exist yet.')
 
     @property
     def intensity_sigma(self):
-        return self['entry/processed/intensity_sigma']
+        return self['entry/data/Idev']
 
     @intensity_sigma.setter
     def intensity_sigma(self, val):
-        dts = h5z.DatasetH5(source_dataset=val, name='intensity_sigma')
+        dts = h5z.DatasetH5(source_dataset=val, name='Idev')
         dts.attrs['long_name'] = 'Sigma error of scattering intensity'
-        dts.attrs['units'] = 'a.u.'
-        self['entry/processed/intensity_sigma'] = dts
+        dts.attrs['units'] = self.intensity_units
+        self['entry/data/Idev'] = dts
 
     @property
     def redundancy(self):
-        return self['entry/processed/redundancy']
+        return self['entry/data/redundancy']
 
     @redundancy.setter
     def redundancy(self, val):
         dts = h5z.DatasetH5(source_dataset=val, name='redundancy')
         dts.attrs['long_name'] = 'Number of pixels in q-bin'
         dts.attrs['units'] = 'pixels'
-        self['entry/processed/redundancy'] = dts
+        self['entry/data/redundancy'] = dts
 
     @property
     def scale(self):
-        return self['entry/processed/scale'][0]
+        return self['entry/data/Iscale'][0]
 
     @scale.setter
     def scale(self,val):
         val_arr = numpy.array([val])
-        dts = h5z.DatasetH5(source_dataset=val_arr, name='scale')
+        dts = h5z.DatasetH5(source_dataset=val_arr, name='Iscale')
         dts.attrs['long_name'] = 'Scale factor applied to the original data. Usually derived from primary beam.'
-        self['entry/processed/scale'] = dts
+        self['entry/data/Iscale'] = dts
 
     @property
     def parents(self):
@@ -204,34 +210,3 @@ def Reduced1D_factory(base_class=h5z.SaxspointH5):
     return cls_1D
 
 
-def test_Reduced1D_write():
-    fin = "../data/AgBeh_826mm.h5z"
-    header = h5z.SaxspointH5(fin)
-    reduced1d = Reduced1D_factory(type(header))
-    hd1 = reduced1d(header._h5)
-
-    import numpy
-    arr = numpy.array(range(10))
-    hd1.intensity = arr
-    hd1.intensity_sigma = arr
-    hd1.q_values = arr
-    hd1.redundancy = arr
-    hd1.q_value_units = "1/A"
-    hd1.intensity_units= "cm^-2"
-    hd1.scale = 45.4678
-    hd1.parents=[fin, header]
-    hd1.intensity
-    hd1.intensity_sigma
-    hd1.q_values
-    hd1.redundancy
-    hd1.q_value_units
-    hd1.intensity_units
-    hd1.scale
-    hd1.parents
-    hd1.write('AgBeh_826mm_reduced.h5')
-
-    assert reduced1d.is_type('AgBeh_826mm_reduced.h5')
-
-def test_Reduced1D_read():
-
-    assert Reduced1D_factory.is_type('AgBeh_826mm_reduced.h5')

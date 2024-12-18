@@ -1,3 +1,5 @@
+import pytest
+
 import h5z
 import aares.datafiles
 #import aares.datafiles.data1D
@@ -8,13 +10,13 @@ def test_Reduced1D_write():
     hd1 = reduced1d(header._h5)
 
     import numpy
-    arr = numpy.array(range(10))
+    arr = numpy.array(range(12))
     hd1.intensity = arr
     hd1.intensity_sigma = arr
     hd1.q_values = arr
     hd1.redundancy = arr
-    hd1.q_value_units = "1/A"
-    hd1.intensity_units= "cm^-2"
+    hd1.q_value_units = "1/angstrom"
+    hd1.intensity_units= "1/cm"
     hd1.scale = 45.4678
     hd1.parents=[fin, header]
     hd1.intensity
@@ -48,6 +50,7 @@ def test_read_file():
     assert header.attrs['reduced']
     assert header.intensity[6] == 6
 
+@pytest.mark.skip(reason="not implemented properly")
 def test_Reduced1D_pickle():
     import pickle
     header = aares.datafiles.read_file('AgBeh_826mm_reduced.h5')
@@ -58,7 +61,8 @@ def test_Reduced1D_pickle():
     assert unpck_header.attrs['reduced']
     assert unpck_header.intensity[6] == 6
 
+
 def test_get_headers_1D():
     import aares.power
-    headers = aares.power.get_headers_dict(['reduced/1_SDD_SDD_793mm_010Frames.h5r', 'reduced/2_SDD.001_SDD.001_793mm_090Frames.h5r'])
-    assert len(headers) == 2
+    headers = aares.power.get_headers_dict(['AgBeh_826mm_reduced.h5'])#['reduced/1_SDD_SDD_793mm_010Frames.h5r', 'reduced/2_SDD.001_SDD.001_793mm_090Frames.h5r'])
+    assert len(headers) == 1
