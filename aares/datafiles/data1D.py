@@ -184,7 +184,7 @@ def Reduced1D_factory(base_class=h5z.SaxspointH5):
         self.attrs['reduced'] = True
         self.attrs['HDF5_Version'] = h5z.hdf5_version
         self.attrs['creator'] = 'AAres {}'.format(aares.version)
-        self.attrs['file_time'] = datetime.datetime.now().isoformat()
+        #self.attrs['file_time'] = datetime.datetime.now().isoformat()
         self.attrs['base_type'] = base_class.__name__
 
     def add_process(self, name=None, description=None):
@@ -195,6 +195,7 @@ def Reduced1D_factory(base_class=h5z.SaxspointH5):
         proc = h5z.GroupH5(name='process')
         proc.attrs['canSAS_class'] = 'SASprocess'
         proc.attrs['NX_class'] = 'NXprocess'
+        proc['date'] = h5z.DatasetH5(source_dataset=numpy.array(datetime.datetime.now().isoformat(), dtype='S'), name='date')
         if name is not None:
             proc['name'] = h5z.DatasetH5(source_dataset=numpy.array(name, dtype='S'), name='name')
         if description is not None:
