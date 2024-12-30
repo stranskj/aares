@@ -11,6 +11,7 @@ Importing data files
 @contact:    jan.stransky@ibt.cas.cz
 @deffield    updated: Updated
 """
+import re
 
 import aares
 import logging
@@ -71,9 +72,33 @@ ignore_merged = True
         'no special handling fo these is implemented, which can lead to unexpected results.'
 .type = bool
 .expert_level = 1
+
+detect_background = True
+.type = bool
+.help = 'Enable automatic detection of which samples should be used as buffer/matrix.'
+
+background_detection {
+    pattern = buffer pufr matrix
+    .type = str
+    .help = 'A string to search for in `name_from` to flag the sample as background'
+    .multiple = True
+    
+}
+
 }
 ''')
 
+def is_background(file_name, pattern):
+    '''
+    Returns true if `pattern` is present in the `file_name`
+    '''
+
+    if not isinstance(pattern, list):
+        pattern = [pattern]
+
+    search_patterns = [re.compile(patt) for patt in pattern]
+
+    return any(patt.search(file_name) is not None for patt in search_patterns)
 
 class JobImport(aares.Job):
     """
