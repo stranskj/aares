@@ -5,12 +5,14 @@ import math
 import os
 import logging
 import re
+import datetime
 
 import freephil as phil
 
 import aares
 import h5z
-from aares import power as pwr
+from aares import power as pwr, my_print
+
 #from aares.import_file import phil_core as import_phil
 
 group_phil_str = '''
@@ -106,6 +108,8 @@ def validate_headers(file_dict):
         if not file_dict[name].validate():
             logging.info(f'File was removed from processing as invalid: {name}')
             file_dict.pop(name)
+
+
 
 def is_background(file_name, pattern):
     '''
@@ -878,7 +882,7 @@ class DataFilesCarrier:
         except PermissionError:
             aares.RuntimeErrorUser('Cannot write to {}. Permission denied.'.format(file_out))
 
-    def read_headers_from_file(self,file_in=None):
+    def read_headers_from_file(self, file_in: object = None) -> object:
         '''
         Reads the serialized headers from a file
         :param file_in:
@@ -910,3 +914,43 @@ class DataFilesCarrier:
         for item in input_group[self._master_group_name].values():
             header = h5z.SaxspointH5(item)
             self.files_dict[header.path] = header
+
+    def assign_background(self, method='time'):
+        '''
+        Assign background file to each file.
+
+        :param files: Files to be processed
+        :type files: DataFilesCarrier
+        '''
+
+        if method == 'time':
+            for group in self.file_groups:
+                my_print('Assigning background files for group {}'.format(group.name))
+                buffers = {fi.name: datetime.datetime.fromisoformat(self.files_dict[fi.path].file_time_iso)
+                           for fi in group.file if fi.is_background}
+                if len(buffers) == 0:
+                    logging.warning('No background files found for this group.')
+                    continue
+                logging.info('Found {} background files.'.format(len(buffers)))
+                for fi in group.file:
+                    if fi.is_background:
+                        continue
+                    file_time = datetime.datetime.fromisoformat(self.files_dict[fi.path].file_time_iso)
+                    for buff, tm in buffers.items():
+                        if tm < file_time:
+                            best_buffer = buff
+                            buffer_time = tm
+                            break
+                    else:
+                        logging.warning('No suitable background for this file: {}'.format(fi.name))
+                        continue
+
+                    for buff, tm in buffers.items():
+                        if buffer_time < tm < file_time:
+                            best_buffer = buff
+                            buffer_time = tm
+
+                    fi.background = best_buffer
+
+        else:
+            raise NotImplementedError('Unknown method')

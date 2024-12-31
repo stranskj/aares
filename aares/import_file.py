@@ -25,6 +25,8 @@ import aares.datafiles #import phil_files, is_fls
 import freephil as phil
 import os
 
+from aares import my_print
+
 prog_short_description = 'Finds and import the data files'
 
 phil_core = phil.parse('''
@@ -78,15 +80,27 @@ detect_background = True
 .help = 'Enable automatic detection of which samples should be used as buffer/matrix.'
 
 background_detection {
-    pattern = buffer pufr matrix
+    pattern = "buffer pufr matrix"
     .type = str
-    .help = 'A string to search for to flag the sample as background'
-    .multiple = True
+    .help = 'A string to search for to flag the sample as background. Multiple space separated can be provided.'
+    #.multiple = True
     
     search_in = *name path
     .type = choice
-    .help = 'Where should be the string searched for: `path` in the `file.path`; `name` in the `file.path`'
+    .help = 'Where should be the string searched for: `path` in the `file.path`; `name` in the `file.name`'
         
+}
+
+assign_background = True
+.type = bool
+.help = 'Enable automatic assignment of which background belongs to which sample.'
+
+background_assignment {
+    method = *time
+    .type = choice
+    .help = 'Method used to assign background. `time` - use the previous file (by  time), which was flagged as buffer.'
+    
+
 }
 
 }
@@ -155,7 +169,14 @@ class JobImport(aares.Job):
         #       print(files.as_str(expert_level=0))
 
         if self.params.to_import.detect_background:
+            if ' ' in self.params.to_import.background_detection.pattern:
+                self.params.to_import.background_detection.pattern = self.params.to_import.background_detection.pattern.split(' ')
+            my_print('Detecting background files...')
             run.detect_background(self.params.to_import.background_detection.pattern, self.params.to_import.background_detection.search_in)
+
+        if self.params.to_import.assign_background:
+            my_print('Assigning background files...')
+            run.assign_background(self.params.to_import.background_assignment.method)
 
         if self.params.to_import.output is not None:
             run.write_groups(self.params.to_import.output)
