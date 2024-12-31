@@ -53,6 +53,14 @@ group_phil_str = '''
         frames = None
         .type = str
         #.help = "Use only selected frames from the file. The frames are 0-indexed. The format is comma-separated list of frames or frame ranges, range boundaries are column-separated, left is inclusive, eight is exclusive. Valid examples: [1,2,3, 8,9] [:3, 6:9, 12:] [3,4, 8:12]"
+        
+        is_background = None
+        .type = bool
+        .help = "Whether the file was recognized as background or not"
+        
+        background = None
+        .type = str
+        .help = "Which background file to use. The file is specified by its `file.name`"
     }
 '''
 group_phil = phil.parse(group_phil_str)
@@ -98,6 +106,34 @@ def validate_headers(file_dict):
         if not file_dict[name].validate():
             logging.info(f'File was removed from processing as invalid: {name}')
             file_dict.pop(name)
+
+def is_background(file_name, pattern):
+    '''
+    Returns true if `pattern` is present in the `file_name`
+    '''
+
+    if not isinstance(pattern, list):
+        pattern = [pattern]
+
+    search_patterns = [re.compile(patt) for patt in pattern]
+
+    return any(patt.search(file_name) is not None for patt in search_patterns)
+
+def detect_background(group, pattern, search_in='name'):
+    '''
+    Detect, if the file is a background file based on `pattern`.
+    :param group: group scope_extract
+    '''
+
+    for fi in group.file:
+        if search_in == 'name':
+            search = fi.name
+        elif search_in == 'path':
+            search = fi.path
+        else:
+            raise ValueError(f'Invalid `search_in`: {search_in}')
+        fi.is_background = is_background(search, pattern)
+
 
 def longest_common(list_strings, sep='_'):
     """
@@ -778,6 +814,9 @@ class DataFilesCarrier:
 
         self.files_dict = sorted_dict
 
+    def detect_background(self, pattern='buffer', search_in='name'):
+        for group in self.file_groups:
+            detect_background(group, pattern, search_in=search_in)
 
     def write_groups(self,file_out='files.fls', update=True):
         '''

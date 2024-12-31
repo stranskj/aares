@@ -80,25 +80,19 @@ detect_background = True
 background_detection {
     pattern = buffer pufr matrix
     .type = str
-    .help = 'A string to search for in `name_from` to flag the sample as background'
+    .help = 'A string to search for to flag the sample as background'
     .multiple = True
     
+    search_in = *name path
+    .type = choice
+    .help = 'Where should be the string searched for: `path` in the `file.path`; `name` in the `file.path`'
+        
 }
 
 }
 ''')
 
-def is_background(file_name, pattern):
-    '''
-    Returns true if `pattern` is present in the `file_name`
-    '''
 
-    if not isinstance(pattern, list):
-        pattern = [pattern]
-
-    search_patterns = [re.compile(patt) for patt in pattern]
-
-    return any(patt.search(file_name) is not None for patt in search_patterns)
 
 class JobImport(aares.Job):
     """
@@ -159,6 +153,10 @@ class JobImport(aares.Job):
 
         files = aares.datafiles.phil_files.format(run.file_groups)
         #       print(files.as_str(expert_level=0))
+
+        if self.params.to_import.detect_background:
+            run.detect_background(self.params.to_import.background_detection.pattern, self.params.to_import.background_detection.search_in)
+
         if self.params.to_import.output is not None:
             run.write_groups(self.params.to_import.output)
 
