@@ -11,6 +11,7 @@ Importing data files
 @contact:    jan.stransky@ibt.cas.cz
 @deffield    updated: Updated
 """
+import re
 
 import aares
 import logging
@@ -23,6 +24,8 @@ import aares.datafiles #import phil_files, is_fls
 #from aares.datafiles import DataFilesCarrier
 import freephil as phil
 import os
+
+from aares import my_print
 
 prog_short_description = 'Finds and import the data files'
 
@@ -71,8 +74,38 @@ ignore_merged = True
         'no special handling fo these is implemented, which can lead to unexpected results.'
 .type = bool
 .expert_level = 1
+
+detect_background = True
+.type = bool
+.help = 'Enable automatic detection of which samples should be used as buffer/matrix.'
+
+background_detection {
+    pattern = "buffer pufr matrix"
+    .type = str
+    .help = 'A string to search for to flag the sample as background. Multiple space separated can be provided.'
+    #.multiple = True
+    
+    search_in = *name path
+    .type = choice
+    .help = 'Where should be the string searched for: `path` in the `file.path`; `name` in the `file.name`'
+        
+}
+
+assign_background = True
+.type = bool
+.help = 'Enable automatic assignment of which background belongs to which sample.'
+
+background_assignment {
+    method = *time
+    .type = choice
+    .help = 'Method used to assign background. `time` - use the previous file (by  time), which was flagged as buffer.'
+    
+
+}
+
 }
 ''')
+
 
 
 class JobImport(aares.Job):
@@ -134,6 +167,17 @@ class JobImport(aares.Job):
 
         files = aares.datafiles.phil_files.format(run.file_groups)
         #       print(files.as_str(expert_level=0))
+
+        if self.params.to_import.detect_background:
+            if ' ' in self.params.to_import.background_detection.pattern:
+                self.params.to_import.background_detection.pattern = self.params.to_import.background_detection.pattern.split(' ')
+            my_print('Detecting background files...')
+            run.detect_background(self.params.to_import.background_detection.pattern, self.params.to_import.background_detection.search_in)
+
+        if self.params.to_import.assign_background:
+            my_print('Assigning background files...')
+            run.assign_background(self.params.to_import.background_assignment.method)
+
         if self.params.to_import.output is not None:
             run.write_groups(self.params.to_import.output)
 

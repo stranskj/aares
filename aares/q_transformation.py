@@ -17,9 +17,27 @@ units = *nm A
 .type = choice
 .help = 'Units to be used. The length of scattering vector (:math:`q`) is calculated as :math:`4\pi*sin \\theta/\lambda` in inverse units of choice.'
 
-origin = None
-.type = ints(2)
-.help = Beam position at the detector in pixels (Not implemented yet)
+geometry {
+    beam_center_px = None
+    .type = floats(2)
+    .help = Beam position at the detector in pixels
+
+    sdd = None
+    .type = float
+    .help = Sample to detector distance in meters
+    
+    meridional_angle = None
+    .type = float
+    .help = Meridional angle in radians
+    
+    pixel_size = None
+    .type = floats(2)
+    .help = Pixel size (X,Y) in meters
+    
+    wavelength = None
+    .type = float
+    .help = Wavelength in meters 
+}    
 
 file = None
 .type = path
@@ -334,6 +352,35 @@ class ArrayQ(h5z.SaxspointH5):
         for key in self.geometry_fields:
             self[key] = copy.deepcopy(source[key])
 
+    def modify_geometry(self, geometry): #*args, **kwargs):
+        '''
+        Modify geometry parameters, which are available as class members
+        '''
+
+        # for arg in args:
+        #     if isinstance(arg, phil.scope_extract):
+        #         kwargs.update(arg.__dict__)
+        # try:
+        #     for k, v in geometry.__dict__.items():
+        #         if v is not None:
+        #             self.__dict__[k] = v
+        #             logging.debug('Geometry parameter updated: {}'.format(k))
+        # except KeyError:
+        #     raise AttributeError('Unknown geometry parameter: {}'.format(k))
+        # pass
+        pass
+
+        if geometry.beam_center_px is not None:
+            self.beam_center_px = geometry.beam_center_px
+        if geometry.meridional_angle is not None:
+            self.meridional_angle = geometry.meridional_angle
+        if geometry.pixel_size is not None:
+            self.pixel_size = geometry.pixel_size
+        if geometry.wavelength is not None:
+            self.wavelength = geometry.wavelength
+        if geometry.sdd is not None:
+            self.sdd = geometry.sdd
+
     def read_from_file(self, fin):
         '''
         Reads the data from a dedicated file
@@ -476,7 +523,12 @@ class JobQtrasform(aares.Job):
             logging.warning(
                 'Output keyword is ignored, definitions from {} are used instead.'.format(
                     self.params.input_files))
-
+        in_geometry = self.params.q_transformation.geometry
+        modify_geometry = any([in_geometry.beam_center_px is not None,
+                               in_geometry.meridional_angle is not None,
+                               in_geometry.pixel_size is not None,
+                               in_geometry.sdd is not None,
+                               in_geometry.wavelength is not None])
         to_process = []
         if self.params.input_files is not None:
             imported_files = aares.datafiles.DataFilesCarrier(file_phil=self.params.input_files,
@@ -485,20 +537,29 @@ class JobQtrasform(aares.Job):
                 if group.q_space is None:
                     group.q_space = group.name + '.q_space.h5a'
 
+                arrQ = ArrayQ(imported_files.files_dict[group.geometry])
+                if modify_geometry:
+                    group.group_phil.q_transformation.geometry = in_geometry
+                if any([val is not None for val in group.group_phil.q_transformation.geometry.__dict__.values()]):
+                    arrQ.modify_geometry(group.group_phil.q_transformation.geometry)
                 to_process.append(
-                    (group.q_space, ArrayQ(imported_files.files_dict[group.geometry])))
+                    (group.q_space, arrQ))
             aares.my_print('Updating {}...'.format(self.params.input_files))
             imported_files.write_groups(self.params.input_files)
         elif self.params.input is not None:
             if self.params.output is None:
                 self.params.output = self.params.input + '.q_space.h5a'
             aares.my_print('Reading file header...')
-            to_process.append((self.params.output, ArrayQ(self.params.input)))
+            arrQ = ArrayQ(self.params.input)
+            if modify_geometry:
+                arrQ.modify_geometry(in_geometry)
+            to_process.append((self.params.output, arrQ))
         else:
             raise AssertionError
 
         aares.my_print('Performing Q-transformation')
         for fout, arrQ in to_process:
+
             arrQ.calculate_q()
             aares.my_print('Writing: {}'.format(fout))
             arrQ.write_to_file(fout)

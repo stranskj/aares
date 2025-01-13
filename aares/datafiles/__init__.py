@@ -5,12 +5,13 @@ import math
 import os
 import logging
 import re
+import datetime
 
 import freephil as phil
 
 import aares
 import h5z
-from aares import power as pwr
+from aares import power as pwr, my_print
 import aares.datafiles.data1D
 from aares.datafiles.data1D import Reduced1D_meta
 #from aares.import_file import phil_core as import_phil
@@ -82,6 +83,14 @@ group_phil_str = '''
         frames = None
         .type = str
         #.help = "Use only selected frames from the file. The frames are 0-indexed. The format is comma-separated list of frames or frame ranges, range boundaries are column-separated, left is inclusive, eight is exclusive. Valid examples: [1,2,3, 8,9] [:3, 6:9, 12:] [3,4, 8:12]"
+        
+        is_background = None
+        .type = bool
+        .help = "Whether the file was recognized as background or not"
+        
+        background = None
+        .type = str
+        .help = "Which background file to use. The file is specified by its `file.name`"
     }
 '''
 group_phil = phil.parse(group_phil_str)
@@ -127,6 +136,36 @@ def validate_headers(file_dict):
         if not file_dict[name].validate():
             logging.info(f'File was removed from processing as invalid: {name}')
             file_dict.pop(name)
+
+
+
+def is_background(file_name, pattern):
+    '''
+    Returns true if `pattern` is present in the `file_name`
+    '''
+
+    if not isinstance(pattern, list):
+        pattern = [pattern]
+
+    search_patterns = [re.compile(patt) for patt in pattern]
+
+    return any(patt.search(file_name) is not None for patt in search_patterns)
+
+def detect_background(group, pattern, search_in='name'):
+    '''
+    Detect, if the file is a background file based on `pattern`.
+    :param group: group scope_extract
+    '''
+
+    for fi in group.file:
+        if search_in == 'name':
+            search = fi.name
+        elif search_in == 'path':
+            search = fi.path
+        else:
+            raise ValueError(f'Invalid `search_in`: {search_in}')
+        fi.is_background = is_background(search, pattern)
+
 
 def longest_common(list_strings, sep='_'):
     """
@@ -807,6 +846,9 @@ class DataFilesCarrier:
 
         self.files_dict = sorted_dict
 
+    def detect_background(self, pattern='buffer', search_in='name'):
+        for group in self.file_groups:
+            detect_background(group, pattern, search_in=search_in)
 
     def write_groups(self,file_out='files.fls', update=True):
         '''
@@ -868,7 +910,7 @@ class DataFilesCarrier:
         except PermissionError:
             aares.RuntimeErrorUser('Cannot write to {}. Permission denied.'.format(file_out))
 
-    def read_headers_from_file(self,file_in=None):
+    def read_headers_from_file(self, file_in: object = None) -> object:
         '''
         Reads the serialized headers from a file
         :param file_in:
@@ -901,4 +943,42 @@ class DataFilesCarrier:
             header = h5z.SaxspointH5(item)
             self.files_dict[header.path] = header
 
+    def assign_background(self, method='time'):
+        '''
+        Assign background file to each file.
 
+        :param files: Files to be processed
+        :type files: DataFilesCarrier
+        '''
+
+        if method == 'time':
+            for group in self.file_groups:
+                my_print('Assigning background files for group {}'.format(group.name))
+                buffers = {fi.name: datetime.datetime.fromisoformat(self.files_dict[fi.path].file_time_iso)
+                           for fi in group.file if fi.is_background}
+                if len(buffers) == 0:
+                    logging.warning('No background files found for this group.')
+                    continue
+                logging.info('Found {} background files.'.format(len(buffers)))
+                for fi in group.file:
+                    if fi.is_background:
+                        continue
+                    file_time = datetime.datetime.fromisoformat(self.files_dict[fi.path].file_time_iso)
+                    for buff, tm in buffers.items():
+                        if tm < file_time:
+                            best_buffer = buff
+                            buffer_time = tm
+                            break
+                    else:
+                        logging.warning('No suitable background for this file: {}'.format(fi.name))
+                        continue
+
+                    for buff, tm in buffers.items():
+                        if buffer_time < tm < file_time:
+                            best_buffer = buff
+                            buffer_time = tm
+
+                    fi.background = best_buffer
+
+        else:
+            raise NotImplementedError('Unknown method')

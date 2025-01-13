@@ -184,8 +184,10 @@ def run(params):
             # aares.mask.draw_mask(beam_bin_mask,'beam_mask.png')
             q_mask.append(beam_bin_mask)
             if params.reduction.beam_normalize.scale is None:
-                scale, err, num = aares.integrate.integrate(
+                scale, err, num, non_masked = aares.integrate.integrate(
                     files.files_dict[group.file[0].path].data, [beam_bin_mask])
+                if numpy.sum(non_masked) > 0:
+                    logging.warning('Problematic pixels in the area used for normalization.')
                 params.reduction.beam_normalize.scale = scale[0]
                 aares.my_print('Normalization scale: {:.3f}'.format(scale[0]))
 
@@ -213,7 +215,8 @@ def run(params):
         integrate_partial = partial(integrate_file, numdigit=int(math.log10(start_frame)) + 1,
                                     prefix=group_prefix,
                                     nproc=threads,
-                                    scale=params.reduction.beam_normalize.scale)
+                                    scale=params.reduction.beam_normalize.scale,
+                                    non_negative=params.reduction.pixel_mask_per_frame)
         aares.power.map_mp(integrate_partial,
                            list(files_ordered.values()),
                            [q_mask] * len(files_ordered),

@@ -19,7 +19,7 @@ import h5py
 import os
 from abc import ABC, abstractmethod
 import logging
-# from saxspoint import my_print
+#from saxspoint import my_print
 import copy
 import numpy as np
 
@@ -134,7 +134,6 @@ def recompress(path1, path2, log=False, compression='gzip'):
         walk(in_file, out_file, log=log, compression=compression)
     return os.stat(path1).st_size, os.stat(path2).st_size
 
-
 def groupH5_to_scope(group):
     '''
 
@@ -142,7 +141,6 @@ def groupH5_to_scope(group):
     :return:
     '''
     pass
-
 
 def datasetH5_to_scope(dataset, max_length=20):
     '''
@@ -177,7 +175,6 @@ def phil_to_h5(scope):
     '''
     pass
 
-
 class DatasetH5(np.ndarray):
     """
     Class mimicking h5py.Dataset
@@ -190,15 +187,14 @@ class DatasetH5(np.ndarray):
     def __new__(self, source_dataset=None, name=None, *args, **kwargs):
 
         if source_dataset is not None:
-            if isinstance(source_dataset, np.ndarray):
+            if isinstance(source_dataset,np.ndarray):
                 if np.isfortran(source_dataset):
                     order = 'F'
                 else:
                     order = 'C'
             else:
                 order = 'C'
-            obj = super().__new__(self, source_dataset.shape, source_dataset.dtype,
-                                  buffer=source_dataset[()], order=order)
+            obj = super().__new__(self, source_dataset.shape, source_dataset.dtype, buffer=source_dataset[()], order=order)
         else:
             obj = super().__new__(self, *args, **kwargs)
         obj.attrs = {}
@@ -214,6 +210,7 @@ class DatasetH5(np.ndarray):
             for key, val in source_dataset.attrs.items():
                 self.attrs[key] = copy.copy(val)
             self.name = source_dataset.name
+
 
     # It has to be here because standard np.array childs have problems with pickling new attributes
     # It is important for multiprocessing to work
@@ -238,8 +235,8 @@ class DatasetH5(np.ndarray):
 
     # End of the pickling stuff
 
-    def __eq__(self, other):  # It breaks numpy's elements vice comparison
-        if not (isinstance(other, DatasetH5) or isinstance(other, h5py.Dataset)):
+    def __eq__(self, other): # It breaks numpy's elements vice comparison
+        if not (isinstance(other, DatasetH5) or isinstance(other,h5py.Dataset)):
             # don't attempt to compare against unrelated types
             return NotImplemented
         attr_bool = True
@@ -257,7 +254,7 @@ class DatasetH5(np.ndarray):
     def __getitem__(self, item):
         return np.array(super().__getitem__(item))
 
-    def write(self, parent, bigger_than=100, compression='gzip', **kwargs):
+    def write(self, parent, bigger_than = 100, compression = 'gzip', **kwargs):
         '''
         Function used for writing the group to the H5 file
         :param parent: Parent group to be saved in
@@ -367,7 +364,7 @@ class GroupH5(dict):
         except KeyError or AttributeError:
             attr_bool = False
 
-        return super().__eq__(other) and attr_bool
+        return  super().__eq__(other) and attr_bool
 
     def write(self, parent, **kwargs):
         '''
@@ -466,6 +463,80 @@ class InstrumentFileH5(ABC):
         return None
 
     @property
+    @abstractmethod
+    def sdd(self):
+        '''
+        Returns sample to detector distance
+        '''
+        return None
+    @sdd.setter
+    @abstractmethod
+    def sdd(self, val):
+        '''
+        Replaces sample to detector distance
+        '''
+        pass
+
+    @property
+    @abstractmethod
+    def meridional_angle(self):
+        '''
+        Returns sample to meridional angle
+        '''
+        return None
+    @meridional_angle.setter
+    @abstractmethod
+    def meridional_angle(self, val):
+        '''
+        Replaces sample to detector distance
+        '''
+        pass
+
+    @property
+    @abstractmethod
+    def pixel_size(self):
+        '''
+        Returns sample to detector pixel size
+        '''
+        return None
+    @pixel_size.setter
+    @abstractmethod
+    def pixel_size(self, val):
+        '''
+        Replaces sample to detector pixel size
+        '''
+        pass
+
+    @property
+    @abstractmethod
+    def wavelength(self):
+        '''
+        Returns sample X-ray wavelength
+        '''
+        return None
+    @wavelength.setter
+    @abstractmethod
+    def wavelength(self, val):
+        '''
+        Replaces sample X-ray wavelength
+        '''
+        pass
+
+    @property
+    @abstractmethod
+    def beam_center_px(self):
+        '''
+        Returns postition of beam on the detector in pixels
+        '''
+        return None
+    @beam_center_px.setter
+    @abstractmethod
+    def beam_center_px(self, val):
+        '''
+        Replaces postition of beam on the detector in pixels
+        '''
+        pass
+    @property
     def _h5(self):
         try:
             val = self.__h5
@@ -496,7 +567,6 @@ class InstrumentFileH5(ABC):
             # for key, val in h5z.attrs.items():
             #    self.attrs[key] = val
             self._h5 = GroupH5(h5z, exclude=self.skip_entries)
-            pass
 
     def write(self, fout, mode='w', skipped=False, **kwargs):
         '''
@@ -539,6 +609,7 @@ class SaxspointH5(InstrumentFileH5):
 
     :ivar geometry_fields: List of fields, which describe the experiment geometry
     """
+
     skip_entries = ['entry/data/data',
                     'entry/data/x_pixel_offset',
                     'entry/data/y_pixel_offset',
@@ -663,6 +734,15 @@ class SaxspointH5(InstrumentFileH5):
         pixel_size_y = self['entry/instrument/detector/y_pixel_size'].item()
         return pixel_size_x, pixel_size_y
 
+    @pixel_size.setter
+    def pixel_size(self,val):
+        """
+        Set pixel size of the detector in meters
+        """
+        assert len(val) == 2
+        self['entry/instrument/detector/x_pixel_size'][0] = val[0]
+        self['entry/instrument/detector/y_pixel_size'][1] = val[1]
+
     @property
     def detector_offset(self):
         """
@@ -672,6 +752,12 @@ class SaxspointH5(InstrumentFileH5):
         detector_offset_y = self['entry/instrument/detector/x_translation'].item()
         detector_offset_x = self['entry/instrument/detector/height'].item()
         return detector_offset_x, detector_offset_y
+
+    @detector_offset.setter
+    def detector_offset(self, corrXY):
+        assert len(corrXY) == 2
+        self['entry/instrument/detector/x_translation'][0] = corrXY[1] # Y
+        self['entry/instrument/detector/height'][0] = corrXY[0] # X
 
     @property
     def beam_center_px(self):
@@ -685,6 +771,25 @@ class SaxspointH5(InstrumentFileH5):
         y = -det[1] / pix[1]
 
         return x, y
+
+    @beam_center_px.setter
+    def beam_center_px(self, corrXY):
+        assert len(corrXY) == 2
+        pix = self.pixel_size
+        self.detector_offset = (-corrXY[0] * pix[0],
+                                -corrXY[1] * pix[1])
+
+        #raise NotImplementedError
+
+    @property
+    def meridional_angle(self):
+        '''Meridional angle'''
+        return self['entry/instrument/detector/meridional_angle'].item()
+
+    @meridional_angle.setter
+    def meridional_angle(self, val):
+        '''Meridional angle'''
+        self['entry/instrument/detector/meridional_angle'][0] = val
 
     @property
     def frame_size(self):
@@ -700,12 +805,26 @@ class SaxspointH5(InstrumentFileH5):
         """
         return self['entry/instrument/detector/distance'].item()
 
+    @sdd.setter
+    def sdd(self,val):
+        '''
+        Set sample to detector distance
+        '''
+        self['entry/instrument/detector/distance'][0] = float(val)
+
     @property
     def wavelength(self):
         """
         X-ray wavelength
         """
         return self['entry/instrument/monochromator/wavelength'].item()
+
+    @wavelength.setter
+    def wavelength(self, val):
+        """
+        Set X-ray wavelength
+        """
+        self['entry/instrument/monochromator/wavelength'][0] = float(val)
 
     @property
     def time_offset(self):
@@ -777,7 +896,6 @@ class SaxspointH5(InstrumentFileH5):
         :return:
         """
         return self.attrs['abs_path']
-
     @abs_path.setter
     def abs_path(self, val):
         self.attrs['abs_path'] = val
