@@ -82,7 +82,7 @@ class JobExport(aares.Job):
         for param in self.unhandled:
             if aares.datafiles.is_fls(param):
                 self.params.input_files = param
-            elif aares.datafiles.data1D.Reduced1D_meta.is_type(param):
+            elif aares.datafiles.data1D.Reduced1D.is_type(param):
                 self.params.input.file_name.append(param)
             #     if h5z.SaxspointH5.is_type(param):
             #         self.params.input.file_name.append(param)

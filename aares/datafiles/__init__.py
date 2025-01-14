@@ -13,12 +13,14 @@ import aares
 import h5z
 from aares import power as pwr, my_print
 import aares.datafiles.data1D
-from aares.datafiles.data1D import Reduced1D
+from aares.datafiles.data1D import Reduced1D, Subtract1D
+
 #from aares.import_file import phil_core as import_phil
 
 data_file_types = {'SaxspointH5': h5z.SaxspointH5,
                    #'Reduced1D': aares.datafiles.data1D.Reduced1D,
-                   'Reduced1D': Reduced1D
+                   'Reduced1D': Reduced1D,
+                   'Subtracted1D': Subtract1D
                    }
 
 
@@ -29,11 +31,12 @@ def get_file_type(fin):
 
     for name, tp in data_file_types.items():
         if tp.is_type(fin):
-            if name == 'Reduced1D':
-                base_type_name = aares.datafiles.data1D.Reduced1D.base_class_name(fin)
-                return aares.datafiles.data1D.Reduced1D_factory(data_file_types[base_type_name])
-            else:
-                return tp
+            return tp
+            # if name == 'Reduced1D':
+            #     base_type_name = aares.datafiles.data1D.Reduced1D.base_class_name(fin)
+            #     return aares.datafiles.data1D.Reduced1D
+            # else:
+            #     return tp
     raise TypeError('Unknown file type')
 
 def read_file(path):

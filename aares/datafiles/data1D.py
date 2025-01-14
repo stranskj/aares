@@ -63,10 +63,10 @@ class Data1D_meta(ABC):
 
     def __setattr__(self, key, value):
         # If the attribute is '_data1d' or not yet initialized, directly set it
-        if key == '_data1d' or key not in self.__dict__:
-            super().__setattr__(key, value)
-        elif '_data1d' in self.__dict__ and hasattr(self._data1d, key):
+        if '_data1d' in self.__dict__ and key in dir(self._data1d): #hasattr(self._data1d, key):
             setattr(self._data1d, key, value)
+        elif key == '_data1d' or key not in self.__dict__:
+            super().__setattr__(key, value)
         else:
             super().__setattr__(key, value)
 
