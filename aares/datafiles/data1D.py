@@ -45,6 +45,9 @@ class Data1D_meta(ABC):
         if isinstance(path, h5z.InstrumentFileH5):
             data_type = Reduced1D_factory(base_class=type(path))
             self._data1d = data_type(path._h5)
+        elif isinstance(path, Data1D_meta):
+            data_type = Reduced1D_factory(base_class=detector_file_types[path.attrs['base_type']])
+            self._data1d = data_type(path._h5)
         # elif isinstance(path, type) and issubclass(path, h5z.InstrumentFileH5):
         #     data_type = Reduced1D_factory(base_class=path)
         elif os.path.isfile(path) and self.is_type(path):
