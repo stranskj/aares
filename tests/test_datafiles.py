@@ -6,8 +6,9 @@ import aares.datafiles
 def test_Reduced1D_write():
     fin = "../data/AgBeh_826mm.h5z"
     header = h5z.SaxspointH5(fin)
-    reduced1d = aares.datafiles.data1D.Reduced1D_factory(type(header))
-    hd1 = reduced1d(header._h5)
+    #reduced1d = aares.datafiles.data1D.Reduced1D_factory(type(header))
+    #hd1 = reduced1d(header._h5)
+    hd1 = aares.datafiles.Reduced1D(header)
 
     import numpy
     arr = numpy.array(range(12))
@@ -29,11 +30,11 @@ def test_Reduced1D_write():
     hd1.parents
     hd1.write('AgBeh_826mm_reduced.h5')
 
-    assert reduced1d.is_type('AgBeh_826mm_reduced.h5')
+    assert hd1.is_type('AgBeh_826mm_reduced.h5')
 
 def test_Reduced1D_read():
 
-    assert aares.datafiles.data1D.Reduced1D_meta.is_type('AgBeh_826mm_reduced.h5')
+    assert aares.datafiles.data1D.Reduced1D.is_type('AgBeh_826mm_reduced.h5')
 
 #    file_type = aares.datafiles.get_file_type('')
 

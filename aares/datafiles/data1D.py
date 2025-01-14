@@ -1,5 +1,6 @@
 import datetime
 import os.path
+from abc import abstractmethod,ABC
 
 from numpy import dtype
 
@@ -8,7 +9,68 @@ import aares
 import numpy
 import logging
 
-class Reduced1D_meta:
+detector_file_types = {'SaxspointH5': h5z.SaxspointH5,
+                   #'Reduced1D': aares.datafiles.data1D.Reduced1D,
+                   #'Reduced1D': Reduced1D
+                   }
+
+
+class Data1D_meta(ABC):
+
+    @staticmethod
+    @abstractmethod
+    def is_type(value):
+        pass
+
+    @staticmethod
+    def base_class_name(fin_path):
+        try:
+            if h5z.is_h5_file(fin_path):
+                with h5z.FileH5Z(fin_path,'r') as fin:
+                    return fin.attrs['base_type']
+            elif isinstance(fin_path, h5z.GroupH5) or isinstance(fin_path, h5py.Group):
+                return fin_path.attrs['base_type']
+        except KeyError:
+            raise ValueError('This is not a Data1D file.')
+        else:
+            raise ValueError('This is not a Data1D file.')
+
+    def __init__(self, path):
+        '''
+        On new instance of the class, one attribute has to be provided:
+          * path to a file
+          * subclass of h5z.InstrumentFileH5
+          * object of class h5z.InstrumentFileH5
+        '''
+        if isinstance(path, h5z.InstrumentFileH5):
+            data_type = Reduced1D_factory(base_class=type(path))
+            self._data1d = data_type(path._h5)
+        # elif isinstance(path, type) and issubclass(path, h5z.InstrumentFileH5):
+        #     data_type = Reduced1D_factory(base_class=path)
+        elif os.path.isfile(path) and self.is_type(path):
+            base_type = detector_file_types[self.base_class_name(path)]
+            data_type = Reduced1D_factory(base_class=base_type)
+            self._data1d = data_type(path)
+        else:
+            raise ValueError('Unexpected type of parameter was recieved: {}'.format(type(path)))
+
+    def __getattr__(self, item):
+        # Check if '_data1d' is in the instance dictionary
+        if '_data1d' in self.__dict__ and hasattr(self._data1d, item):
+            return getattr(self._data1d, item)
+        else:
+            raise AttributeError(f"'{type(self).__name__}' object has no attribute '{item}'")
+
+    def __setattr__(self, key, value):
+        # If the attribute is '_data1d' or not yet initialized, directly set it
+        if key == '_data1d' or key not in self.__dict__:
+            super().__setattr__(key, value)
+        elif '_data1d' in self.__dict__ and hasattr(self._data1d, key):
+            setattr(self._data1d, key, value)
+        else:
+            super().__setattr__(key, value)
+
+class Reduced1D(Data1D_meta):
     @staticmethod
     def is_type(val):
 
@@ -27,20 +89,40 @@ class Reduced1D_meta:
 
         return out
 
-    @staticmethod
-    def base_class_name(fin_path):
-        try:
-            if h5z.is_h5_file(fin_path):
-                with h5z.FileH5Z(fin_path,'r') as fin:
-                    return fin.attrs['base_type']
-            elif isinstance(fin_path, h5z.GroupH5) or isinstance(fin_path, h5py.Group):
-                return fin_path.attrs['base_type']
-        except KeyError:
-            raise ValueError('This is not a Reduced1D file.')
-        else:
-            raise ValueError('This is not a Reduced1D file.')
 
-def Reduced1D_factory(base_class=h5z.SaxspointH5):
+
+
+class Subtract1D(Data1D_meta):
+    @staticmethod
+    def is_type(val):
+        attributes = {}
+        if h5z.is_h5_file(val):
+            with h5z.FileH5Z(val, 'r') as fin:
+                attributes.update(fin.attrs)
+        elif isinstance(val, h5z.GroupH5) or isinstance(val, h5py.Group):
+            attributes.update(val.attrs)
+        else:
+            raise TypeError('Input should be h5py.Group-like object.')
+        try:
+            out = attributes['subtracted']
+        except KeyError:
+            out = False
+
+        return out
+
+    def update_attributes(self):
+        '''
+        Updates file attributes
+        '''
+        #self.attrs['reduced'] = True
+        self.attrs['subtracted'] = True
+        self.attrs['HDF5_Version'] = h5z.hdf5_version
+        self.attrs['creator'] = 'AAres {}'.format(aares.version)
+        #self.attrs['file_time'] = datetime.datetime.now().isoformat()
+        #self.attrs['base_type'] = base_class.__name__
+
+
+def Reduced1D_factory(base_class=(h5z.SaxspointH5,)):
 
     assert issubclass(base_class, h5z.InstrumentFileH5)
     def __init__(self, path):
@@ -71,6 +153,7 @@ def Reduced1D_factory(base_class=h5z.SaxspointH5):
             out = False
 
         return out
+
     @property
     def q_values(self):
         return self['entry/data/Q']
@@ -201,6 +284,8 @@ def Reduced1D_factory(base_class=h5z.SaxspointH5):
         if description is not None:
             proc['description'] = h5z.DatasetH5(source_dataset=numpy.array(description, dtype='S'), name='description')
 
+        self['entry/process'] = proc
+
     def write(self, *args, **kwargs):
         '''
         Writes the file
@@ -208,7 +293,7 @@ def Reduced1D_factory(base_class=h5z.SaxspointH5):
         self.update_attributes()
         super(type(self), self).write(*args, **kwargs)
 
-    cls_1D = type("Reduced1D", (base_class,),
+    cls_1D = type("Data1D", (base_class,),
                   {
                       "__init__":        __init__,
                       "is_type":         is_type,
