@@ -11,6 +11,8 @@ Background subtraction
 @contact:    jan.stransky@ibt.cas.cz
 @deffield    updated: Updated
 """
+import copy
+
 import numpy
 
 import aares
@@ -52,6 +54,9 @@ phil_subtract = phil.parse('''
         file = 'subtracted.h5s'
         .type = path
         .help = Output file
+        out_files = 'subtracted.fls'
+        .type = path
+        .help = List of the output files in FLS format.
     }
 
 ''' + phil_export_str, process_includes=True)
@@ -94,7 +99,6 @@ def subtract_file(data, background, output, export=None):
     if export is not None:
         subtracted.export(export)
 
-    #TODO: return the file
 
 def subtract_group(group, files_dict, output_dir, export=None):
     '''
@@ -103,6 +107,8 @@ def subtract_group(group, files_dict, output_dir, export=None):
 
     assert os.path.isdir(output_dir)
     files_by_name = group.files_by_name
+    output_group = copy.deepcopy(group) #aares.datafiles.FileGroup(group.group_phil)
+    output_group.file = []
     for name, fi in files_by_name.items():
         if fi.is_background:
             continue
@@ -115,7 +121,10 @@ def subtract_group(group, files_dict, output_dir, export=None):
         subtract_file(files_dict[work_file], files_dict[background], output_name, export=export)
         my_print('Background subtracted file written: {}'.format(output_name))
 
-    # TODO: Return the group
+        fiout = aares.datafiles.file_object(path=output_name, name= name)
+        output_group.file.append(fiout)
+
+    return output_group
 
 class JobSubtract(aares.Job):
     """
@@ -177,11 +186,16 @@ class JobSubtract(aares.Job):
 
         if self.params.input.data_file is None and self.params.input.background_file is None and self.params.input_files is  not None:
             files_in = aares.datafiles.DataFilesCarrier(file_phil=self.params.input_files, mainphil=self.system_phil)
+            files_out = copy.deepcopy(files_in)
+            files_out.file_groups = []
             aares.create_directory(self.params.output.directory)
             for group in files_in.file_groups:
-                subtract_group(group, files_in.files_dict, self.params.output.directory)
+                output_group = subtract_group(group, files_in.files_dict, self.params.output.directory)
+                files_out.file_groups.append(output_group)
 
-            # TODO: write FLS file with subtracted data
+            files_out.write_groups(self.params.output.out_files)
+            my_print('Output files written: {}'.format(self.params.output.out_files))
+
         elif self.params.input.data_file is not None and self.params.input.background_file is not None and self.params.input_files is None:
             my_print('Subtracting background ({}) data from file: {}'.format(self.params.input.background_file, self.params.input.data_file))
             subtract_file(self.params.input.data_file, self.params.input.background_file, self.params.output)
