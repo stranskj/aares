@@ -382,6 +382,10 @@ class FileGroup():
         return new_copy
 
     @property
+    def files_by_name(self):
+        return {fi.name: fi for fi in self.file }
+
+    @property
     def group_phil(self):
         '''
         Scope extract of the configuration for the group

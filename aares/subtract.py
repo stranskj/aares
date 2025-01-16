@@ -23,6 +23,9 @@ import freephil as phil
 
 __all__ = []
 __version__ = aares.__version__
+
+from aares import my_print
+
 prog_short_description = 'Performs background subtraction.'
 
 phil_export_str = '''
@@ -43,9 +46,12 @@ phil_subtract = phil.parse('''
     include scope aares.common.phil_export
 
     output {
-        directory = None
+        directory = 'subtracted'
         .type = path
         .help = Output folder for the processed data
+        file = 'subtracted.h5s'
+        .type = path
+        .help = Output file
     }
 
 ''' + phil_export_str, process_includes=True)
@@ -70,6 +76,47 @@ def subtract_reduced(data, background):
 
     return output
 
+def subtract_file(data, background, output, export=None):
+    '''
+    Subtracts background intensities from data from two compatible files.
+    '''
+
+    if type(data) == str and os.path.isfile(data):
+        data = aares.datafiles.read_file(data)
+
+    if type(background) == str and os.path.isfile(background):
+        background = aares.datafiles.read_file(background)
+
+    subtracted = subtract_reduced(data, background)
+
+    subtracted.write(output)
+
+    if export is not None:
+        subtracted.export(export)
+
+    #TODO: return the file
+
+def subtract_group(group, files_dict, output_dir, export=None):
+    '''
+    Subtract data defined within a group.
+    '''
+
+    assert os.path.isdir(output_dir)
+    files_by_name = group.files_by_name
+    for name, fi in files_by_name.items():
+        if fi.is_background:
+            continue
+
+        work_file = fi.path
+        background =files_by_name[fi.background].path
+
+        logging.info('Processing: {}\nSubtracting background ({}) from file {}'.format(name,background, work_file))
+        output_name = os.path.join(output_dir,fi.name+'.h5s')
+        subtract_file(files_dict[work_file], files_dict[background], output_name, export=export)
+        my_print('Background subtracted file written: {}'.format(output_name))
+
+    # TODO: Return the group
+
 class JobSubtract(aares.Job):
     """
     Run class based on generic saxspoint run class
@@ -89,7 +136,7 @@ class JobSubtract(aares.Job):
         for param in self.unhandled:
             if aares.datafiles.is_fls(param):
                 self.params.input_files = param
-            elif aares.datafiles.data1D.Reduced1D.is_type(param):
+            elif os.path.isfile(param) and aares.datafiles.data1D.Reduced1D.is_type(param):
                 files1d.append(param)
             #     if h5z.SaxspointH5.is_type(param):
             #         self.params.input.file_name.append(param)
@@ -128,10 +175,17 @@ class JobSubtract(aares.Job):
         Function, which is actually run on class execution.
         """
 
-        if self.params.input.file_name is not None and len(self.params.input.file_name) > 0:
-            files_in = aares.datafiles.DataFilesCarrier(run_phil=self.params, mainphil=self.system_phil)
-        elif self.params.input_files is not None:
+        if self.params.input.data_file is None and self.params.input.background_file is None and self.params.input_files is  not None:
             files_in = aares.datafiles.DataFilesCarrier(file_phil=self.params.input_files, mainphil=self.system_phil)
+            aares.create_directory(self.params.output.directory)
+            for group in files_in.file_groups:
+                subtract_group(group, files_in.files_dict, self.params.output.directory)
+
+            # TODO: write FLS file with subtracted data
+        elif self.params.input.data_file is not None and self.params.input.background_file is not None and self.params.input_files is None:
+            my_print('Subtracting background ({}) data from file: {}'.format(self.params.input.background_file, self.params.input.data_file))
+            subtract_file(self.params.input.data_file, self.params.input.background_file, self.params.output)
+            my_print('Subtracted data written to file: {}'.format(self.params.output.data_file))
         else:
             raise aares.RuntimeErrorUser('Unsupported input.')
 
