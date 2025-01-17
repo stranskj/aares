@@ -646,6 +646,8 @@ class SaxspointH5(InstrumentFileH5):
 
         if isinstance(path, GroupH5):
             self._h5 = copy.deepcopy(path)
+        elif isinstance(path, InstrumentFileH5):
+            self._h5 = copy.deepcopy(path._h5)
         elif isinstance(path, h5py.Group):
             self._h5 = GroupH5(path)
         elif is_h5_file(path):

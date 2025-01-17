@@ -69,7 +69,7 @@ def subtract_reduced(data, background):
     if data.intensity.shape != background.intensity.shape:
         raise ValueError('Shape of data and background intensities do not match.')
 
-    output = aares.datafiles.Subtract1D(data)
+    output = aares.datafiles.Subtract1D(data, exclude=False)
 
     output.intensity = data.intensity - background.intensity
     output.intensity_sigma = numpy.sqrt(data.intensity_sigma**2 + background.intensity_sigma**2)

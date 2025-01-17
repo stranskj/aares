@@ -17,6 +17,9 @@ detector_file_types = {'SaxspointH5': h5z.SaxspointH5,
 
 class Data1D_meta(ABC):
 
+    #TODO: Skip entries specific to 1D data: Intensity, sigma, redundancy...
+
+
     @staticmethod
     @abstractmethod
     def is_type(value):
@@ -35,7 +38,7 @@ class Data1D_meta(ABC):
         else:
             raise ValueError('This is not a Data1D file.')
 
-    def __init__(self, path):
+    def __init__(self, path, exclude=True):
         '''
         On new instance of the class, one attribute has to be provided:
           * path to a file
@@ -47,7 +50,7 @@ class Data1D_meta(ABC):
             self._data1d = data_type(path._h5)
         elif isinstance(path, Data1D_meta):
             data_type = Reduced1D_factory(base_class=detector_file_types[path.attrs['base_type']])
-            self._data1d = data_type(path._h5)
+            self._data1d = data_type(path, exclude=exclude)
         # elif isinstance(path, type) and issubclass(path, h5z.InstrumentFileH5):
         #     data_type = Reduced1D_factory(base_class=path)
         elif os.path.isfile(path) and self.is_type(path):
@@ -126,10 +129,28 @@ class Subtract1D(Data1D_meta):
 
 
 def Reduced1D_factory(base_class=(h5z.SaxspointH5,)):
+    skip_entries = [
+        'entry/data/Idev',
+        'entry/data/I',
+        'entry/data/redundancy',
+        'entry/data/Iscale',
+        'entry/data/Q',
 
+    ]
     assert issubclass(base_class, h5z.InstrumentFileH5)
-    def __init__(self, path):
-        super(type(self), self).__init__(path)
+    def __init__(self, path, exclude=True):
+
+
+        if isinstance(path, Data1D_meta):
+            super(type(self), self).__init__(path._data1d)
+            if not exclude:
+                for entry in skip_entries:
+                    try:
+                        self[entry] = path[entry]
+                    except KeyError:
+                        logging.debug('Skipping entry "{}" because it does not exist.'.format(entry))
+        else:
+            super(type(self), self).__init__(path)
 
 #        self.skip_entries.append('entry/processed/intensity')
 #         empty_arr = numpy.empty(0)
@@ -311,6 +332,7 @@ def Reduced1D_factory(base_class=(h5z.SaxspointH5,)):
                       "update_attributes": update_attributes,
                       "write":           write,
                       "add_process":     add_process,
+                      "skip_entries":    skip_entries,
                   })
     return cls_1D
 
