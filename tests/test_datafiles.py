@@ -12,14 +12,16 @@ def test_Reduced1D_write():
 
     import numpy
     arr = numpy.array(range(12))
+    hd1.parents = [fin, header]
     hd1.intensity = arr
+    hd1.intensity
     hd1.intensity_sigma = arr
     hd1.q_values = arr
     hd1.redundancy = arr
     hd1.q_value_units = "1/angstrom"
     hd1.intensity_units= "1/cm"
     hd1.scale = 45.4678
-    hd1.parents=[fin, header]
+
     hd1.intensity
     hd1.intensity_sigma
     hd1.q_values
@@ -31,6 +33,24 @@ def test_Reduced1D_write():
     hd1.write('AgBeh_826mm_reduced.h5')
 
     assert hd1.is_type('AgBeh_826mm_reduced.h5')
+
+def test_Subtract1D_write():
+    fin = "../data/AgBeh_826mm.h5z"
+    header = h5z.SaxspointH5(fin)
+    hd1 = aares.datafiles.Subtract1D(header)
+    import numpy
+    arr = numpy.array(range(12))
+    hd1.intensity = arr
+    hd1.intensity_sigma = arr
+    hd1.q_values = arr
+    hd1.update_attributes()
+
+    assert hd1['entry/data/I'][2] == 2
+    hd1.write('AgBeh_826mm_subtracted.h5')
+    assert hd1.is_type('AgBeh_826mm_subtracted.h5')
+
+
+
 
 def test_Reduced1D_read():
 

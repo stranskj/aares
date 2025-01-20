@@ -342,6 +342,8 @@ class GroupH5(dict):
         if split_key == ['']:
             raise KeyError
         elif len(split_key) == 1:
+            if isinstance(value, DatasetH5) and value.name is not None and self.name is not None and len(value.name.strip('/').split('/'))==1: # or isinstance(value, GroupH5) ?????
+                value.name = self.name + '/' + value.name
             dict.__setitem__(self, split_key[0], value)
         else:
             if split_key[0] not in self:
@@ -430,7 +432,8 @@ class InstrumentFileH5(ABC):
         return True
 
     def __getitem__(self, key):
-        if key in self.skip_entries:
+        wlk = self.walk()
+        if key in self.skip_entries and not '/'+key in wlk:
             with FileH5Z(self.abs_path, 'r') as h5f:
                 val = ItemH5(h5f[key])
         else:
@@ -562,6 +565,7 @@ class InstrumentFileH5(ABC):
             except AttributeError:
                 raise AttributeError('Path to the file was not given or set.')
         # TODO : handle missing/wrong file exceptions
+
         with FileH5Z(path, 'r', **filters) as h5z:
             # walk(h5z, self._h5, skip=skip_entries, **filters)
             # for key, val in h5z.attrs.items():
@@ -610,13 +614,13 @@ class SaxspointH5(InstrumentFileH5):
     :ivar geometry_fields: List of fields, which describe the experiment geometry
     """
 
-    skip_entries = ['entry/data/data',
-                    'entry/data/x_pixel_offset',
-                    'entry/data/y_pixel_offset',
-                    'entry/instrument/detector/data',
-                    # 'entry/instrument/detector/x_pixel_offset',
-                    # 'entry/instrument/detector/y_pixel_offset',
-                    ]
+    # skip_entries = ['entry/data/data',
+    #                 'entry/data/x_pixel_offset',
+    #                 'entry/data/y_pixel_offset',
+    #                 'entry/instrument/detector/data',
+    #                 # 'entry/instrument/detector/x_pixel_offset',
+    #                 # 'entry/instrument/detector/y_pixel_offset',
+    #                 ]
 
     geometry_fields = [
         'entry/instrument/detector/depends_on',
@@ -635,7 +639,7 @@ class SaxspointH5(InstrumentFileH5):
         'entry/instrument/monochromator',
     ]
 
-    def __init__(self, path):
+    def __init__(self, path, skip_entries=None):
         '''
 
         :param path: Path to the file to be read into the object
@@ -643,6 +647,17 @@ class SaxspointH5(InstrumentFileH5):
         # self.__temp = tempfile.TemporaryFile()
         # self._h5 = h5py.File(self.__temp, 'a')
         # self._h5
+
+        self.skip_entries = ['entry/data/data',
+                        'entry/data/x_pixel_offset',
+                        'entry/data/y_pixel_offset',
+                        'entry/instrument/detector/data',
+                        # 'entry/instrument/detector/x_pixel_offset',
+                        # 'entry/instrument/detector/y_pixel_offset',
+                        ]
+        if skip_entries is not None:
+            self.skip_entries = skip_entries
+
 
         if isinstance(path, GroupH5):
             self._h5 = copy.deepcopy(path)
@@ -686,6 +701,15 @@ class SaxspointH5(InstrumentFileH5):
             out = False
 
         return out
+
+    @property
+    def skip_entries(self):
+        return self._skip_entries
+
+    @skip_entries.setter
+    def skip_entries(self, val):
+        self._skip_entries = val
+
 
     def validate(self):
         '''

@@ -56,7 +56,7 @@ class Data1D_meta(ABC):
         elif os.path.isfile(path) and self.is_type(path):
             base_type = detector_file_types[self.base_class_name(path)]
             data_type = Reduced1D_factory(base_class=base_type)
-            self._data1d = data_type(path)
+            self._data1d = data_type(path, exclude=exclude)
         else:
             raise ValueError('Unexpected type of parameter was recieved: {}'.format(type(path)))
 
@@ -75,6 +75,12 @@ class Data1D_meta(ABC):
             super().__setattr__(key, value)
         else:
             super().__setattr__(key, value)
+
+    def __getitem__(self,item):
+        return self._data1d[item]
+
+    def __setitem__(self, key, value):
+        self._data1d[key] = value
 
 class Reduced1D(Data1D_meta):
     @staticmethod
@@ -129,28 +135,26 @@ class Subtract1D(Data1D_meta):
 
 
 def Reduced1D_factory(base_class=(h5z.SaxspointH5,)):
-    skip_entries = [
+    _skip_entries = [
         'entry/data/Idev',
         'entry/data/I',
         'entry/data/redundancy',
         'entry/data/Iscale',
         'entry/data/Q',
-
     ]
     assert issubclass(base_class, h5z.InstrumentFileH5)
     def __init__(self, path, exclude=True):
 
-
         if isinstance(path, Data1D_meta):
-            super(type(self), self).__init__(path._data1d)
+            super(type(self), self).__init__(path._data1d, skip_entries=_skip_entries)
             if not exclude:
-                for entry in skip_entries:
+                for entry in _skip_entries:
                     try:
                         self[entry] = path[entry]
                     except KeyError:
                         logging.debug('Skipping entry "{}" because it does not exist.'.format(entry))
         else:
-            super(type(self), self).__init__(path)
+            super(type(self), self).__init__(path, skip_entries=_skip_entries)
 
 #        self.skip_entries.append('entry/processed/intensity')
 #         empty_arr = numpy.empty(0)
@@ -209,7 +213,7 @@ def Reduced1D_factory(base_class=(h5z.SaxspointH5,)):
         dts = h5z.DatasetH5(source_dataset=val, name='I')
         dts.attrs['long_name'] = 'Scattering intensity'
         dts.attrs['units'] = 'arbitrary'
-        dts.attrs['uncertainities']='Idev'
+        dts.attrs['uncertainties']='Idev'
         self['entry/data/I'] = dts
 
 
@@ -332,7 +336,7 @@ def Reduced1D_factory(base_class=(h5z.SaxspointH5,)):
                       "update_attributes": update_attributes,
                       "write":           write,
                       "add_process":     add_process,
-                      "skip_entries":    skip_entries,
+                     # "skip_entries":    skip_entries,
                   })
     return cls_1D
 

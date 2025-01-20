@@ -14,6 +14,7 @@ Background subtraction
 import copy
 
 import numpy
+import numpy as np
 
 import aares
 import aares.datafiles
@@ -198,8 +199,8 @@ class JobSubtract(aares.Job):
 
         elif self.params.input.data_file is not None and self.params.input.background_file is not None and self.params.input_files is None:
             my_print('Subtracting background ({}) data from file: {}'.format(self.params.input.background_file, self.params.input.data_file))
-            subtract_file(self.params.input.data_file, self.params.input.background_file, self.params.output)
-            my_print('Subtracted data written to file: {}'.format(self.params.output.data_file))
+            subtract_file(self.params.input.data_file, self.params.input.background_file, self.params.output.file)
+            my_print('Subtracted data written to file: {}'.format(self.params.output.file))
         else:
             raise aares.RuntimeErrorUser('Unsupported input.')
 
