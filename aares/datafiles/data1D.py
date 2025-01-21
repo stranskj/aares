@@ -146,15 +146,15 @@ def Reduced1D_factory(base_class=(h5z.SaxspointH5,)):
     def __init__(self, path, exclude=True):
 
         if isinstance(path, Data1D_meta):
-            super(type(self), self).__init__(path._data1d, skip_entries=_skip_entries)
+            super(type(self), self).__init__(path._data1d) #, skip_entries=_skip_entries)
             if not exclude:
-                for entry in _skip_entries:
+                for entry in self.skip_entries: #_skip_entries:
                     try:
                         self[entry] = path[entry]
                     except KeyError:
                         logging.debug('Skipping entry "{}" because it does not exist.'.format(entry))
         else:
-            super(type(self), self).__init__(path, skip_entries=_skip_entries)
+            super(type(self), self).__init__(path) #, skip_entries=_skip_entries)
 
 #        self.skip_entries.append('entry/processed/intensity')
 #         empty_arr = numpy.empty(0)
@@ -181,6 +181,10 @@ def Reduced1D_factory(base_class=(h5z.SaxspointH5,)):
             out = False
 
         return out
+
+    @property
+    def skip_entries(self):
+        return _skip_entries
 
     @property
     def q_values(self):
@@ -336,7 +340,7 @@ def Reduced1D_factory(base_class=(h5z.SaxspointH5,)):
                       "update_attributes": update_attributes,
                       "write":           write,
                       "add_process":     add_process,
-                     # "skip_entries":    skip_entries,
+                      "skip_entries":    skip_entries,
                   })
     return cls_1D
 

@@ -651,15 +651,15 @@ class SaxspointH5(InstrumentFileH5):
         # self._h5 = h5py.File(self.__temp, 'a')
         # self._h5
 
-        self.skip_entries = ['entry/data/data',
+        self._skip_entries = ['entry/data/data',
                         'entry/data/x_pixel_offset',
                         'entry/data/y_pixel_offset',
                         'entry/instrument/detector/data',
                         # 'entry/instrument/detector/x_pixel_offset',
                         # 'entry/instrument/detector/y_pixel_offset',
                         ]
-        if skip_entries is not None:
-            self.skip_entries = skip_entries
+        #if skip_entries is not None:
+        #    self.skip_entries = skip_entries
 
 
         if isinstance(path, GroupH5):
@@ -707,11 +707,21 @@ class SaxspointH5(InstrumentFileH5):
 
     @property
     def skip_entries(self):
-        return self._skip_entries
+        if hasattr(self, '_custom_skip_entries') and self._custom_skip_entries:
+            return self._skip_entries
+        else:
+            return ['entry/data/data',
+         'entry/data/x_pixel_offset',
+         'entry/data/y_pixel_offset',
+         'entry/instrument/detector/data',
+         # 'entry/instrument/detector/x_pixel_offset',
+         # 'entry/instrument/detector/y_pixel_offset',
+         ]
 
     @skip_entries.setter
     def skip_entries(self, val):
         self._skip_entries = val
+        self._custom_skip_entries = True
 
 
     def validate(self):

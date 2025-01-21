@@ -21,6 +21,7 @@ def test_read_subtracted():
     data = Subtract1D('subtracted.h5s')
     wlk = data._data1d.walk()
     assert '/entry/data/I' not in wlk
+
     assert data.intensity.shape == data.q_values.shape == data.redundancy.shape
     assert len(data.parents) == 2
 
