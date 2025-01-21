@@ -16,8 +16,9 @@ import copy
 import numpy
 import numpy as np
 
-import aares
+
 import aares.datafiles
+import aares.export
 import aares
 
 import concurrent.futures
@@ -58,6 +59,9 @@ phil_subtract = phil.parse('''
         out_files = 'subtracted.fls'
         .type = path
         .help = List of the output files in FLS format.
+        export = True
+        .type = bool
+        .help = Should the reduced data be exported as DAT files?
     }
 
 ''' + phil_export_str, process_includes=True)
@@ -98,7 +102,11 @@ def subtract_file(data, background, output, export=None):
     subtracted.write(output)
 
     if export is not None:
-        subtracted.export(export)
+        path_export = os.path.splitext(output)[0]+'.dat'
+        aares.export.write_atsas(subtracted.q_values, subtracted.intensity, subtracted.intensity_sigma,
+                                 file_name=path_export,
+                                 header=['# {}\n'.format(subtracted.path)])
+        my_print('Exported file {} to {}'.format(output, path_export))
 
 
 def subtract_group(group, files_dict, output_dir, export=None):
@@ -185,13 +193,18 @@ class JobSubtract(aares.Job):
         Function, which is actually run on class execution.
         """
 
+        if self.params.output.export:
+            export = self.params.export
+        else:
+            export = None
+
         if self.params.input.data_file is None and self.params.input.background_file is None and self.params.input_files is  not None:
             files_in = aares.datafiles.DataFilesCarrier(file_phil=self.params.input_files, mainphil=self.system_phil)
             files_out = copy.deepcopy(files_in)
             files_out.file_groups = []
             aares.create_directory(self.params.output.directory)
             for group in files_in.file_groups:
-                output_group = subtract_group(group, files_in.files_dict, self.params.output.directory)
+                output_group = subtract_group(group, files_in.files_dict, self.params.output.directory, export=export)
                 files_out.file_groups.append(output_group)
 
             files_out.write_groups(self.params.output.out_files)
@@ -199,7 +212,7 @@ class JobSubtract(aares.Job):
 
         elif self.params.input.data_file is not None and self.params.input.background_file is not None and self.params.input_files is None:
             my_print('Subtracting background ({}) data from file: {}'.format(self.params.input.background_file, self.params.input.data_file))
-            subtract_file(self.params.input.data_file, self.params.input.background_file, self.params.output.file)
+            subtract_file(self.params.input.data_file, self.params.input.background_file, self.params.output.file, export=export)
             my_print('Subtracted data written to file: {}'.format(self.params.output.file))
         else:
             raise aares.RuntimeErrorUser('Unsupported input.')
