@@ -342,8 +342,11 @@ class GroupH5(dict):
         if split_key == ['']:
             raise KeyError
         elif len(split_key) == 1:
-            if isinstance(value, DatasetH5) and value.name is not None and self.name is not None and len(value.name.strip('/').split('/'))==1: # or isinstance(value, GroupH5) ?????
-                value.name = self.name + '/' + value.name
+            try:
+                if isinstance(value, DatasetH5) and value.name is not None and self.name is not None and len(value.name.strip('/').split('/'))==1: # or isinstance(value, GroupH5) ?????
+                    value.name = self.name + '/' + value.name
+            except AttributeError:      # This is weird.... During import, it happens that self.name does not exist...
+                pass
             dict.__setitem__(self, split_key[0], value)
         else:
             if split_key[0] not in self:
