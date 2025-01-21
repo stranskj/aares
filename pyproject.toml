@@ -49,3 +49,4 @@ version = {attr = "aares.version.version"}
   "aares.plot" = "aares.plot:main"
   "aares.merge" = "aares.merge:main"
   "aares.draw2d.bins" = "aares.integrate:draw_bins"
+  "aares.subtract" = "aares.subtract:main"
