@@ -103,9 +103,10 @@ def subtract_file(data, background, output, export=None):
 
     if export is not None:
         path_export = os.path.splitext(output)[0]+'.dat'
-        aares.export.write_atsas(subtracted.q_values, subtracted.intensity, subtracted.intensity_sigma,
-                                 file_name=path_export,
-                                 header=['# {}\n'.format(subtracted.path)])
+        subtracted.export(path_export, export)
+        # aares.export.write_atsas(subtracted.q_values, subtracted.intensity, subtracted.intensity_sigma,
+        #                          file_name=path_export,
+        #                          header=['# {}\n'.format(subtracted.path)])
         my_print('Exported file {} to {}'.format(output, path_export))
 
 

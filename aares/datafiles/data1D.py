@@ -1,5 +1,6 @@
 import datetime
 import os.path
+import sys
 from abc import abstractmethod,ABC
 
 from numpy import dtype
@@ -45,9 +46,6 @@ def write_atsas(q_val, avr, std, file_name, header=[], footer=[], separator=" ")
 
 
 class Data1D_meta(ABC):
-
-    #TODO: Skip entries specific to 1D data: Intensity, sigma, redundancy...
-
 
     @staticmethod
     @abstractmethod
@@ -300,8 +298,8 @@ def Reduced1D_factory(base_class=(h5z.SaxspointH5,)):
     @property
     def parents(self):
         try:
-            #return [it.decode() for it in self['entry/data/parents']]
-            self['entry/data/parents']
+            return [it.decode() for it in self['entry/data/parents'].tolist()]
+            #return self['entry/data/parents']
         except KeyError:
             logging.debug('File does not have any parents: {}'.format(self.path))
             return None
@@ -363,7 +361,7 @@ def Reduced1D_factory(base_class=(h5z.SaxspointH5,)):
             aares.common.phil_export.format(params)
 
         if self.q_value_units not in ['1/nm', '1/angstrom', '1/m']:
-            if len(self.q_value[self.q_value < 1]) > len(self.q_value):
+            if len(self.q_values[self.q_values < 1]) > len(self.q_values):
                 in_units = '1/angstrom'
             else:
                 in_units = '1/nm'
@@ -392,13 +390,13 @@ def Reduced1D_factory(base_class=(h5z.SaxspointH5,)):
         parents = self.parents if self.parents is not None else []
 
         header =[f'Sample description: {self.sample_name}\n',
-                 f'Sample: c= 0mg/ml Code:\n',
-                 'Parent(s):' + ' '.join(parents),
+                 f'Sample: c= 0 mg/ml Code:\n',
+                 'Parent(s): ' + ' '.join(parents),
                  '\n']
 
         footer = ['range-from: 1\n',
                   f'range-to: {len(self.q_values)}\n',
-                  f'creator: {__name__}\n',
+                  f'creator: {sys.argv[0]}\n',
                   f'creator-version: {aares.__version__}',]
         footer.extend('\nparent: '.join(['']+parents))
 
