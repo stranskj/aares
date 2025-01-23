@@ -31,6 +31,7 @@ def test_Reduced1D_write():
     hd1.scale
     hd1.parents
     hd1.write('AgBeh_826mm_reduced.h5')
+    hd1.export('AgBeh_826mm_reduced.dat')
 
     assert hd1.is_type('AgBeh_826mm_reduced.h5')
 
@@ -68,6 +69,7 @@ def test_get_file_type():
 
 def test_read_file():
     header = aares.datafiles.read_file('AgBeh_826mm_reduced.h5')
+    header.parents
     assert header.attrs['reduced']
     assert header.intensity[6] == 6
 

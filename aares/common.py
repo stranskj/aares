@@ -49,6 +49,12 @@ export {
             'original' - same as the source file name; 
             'name' - same as the name in the AAres imported files;
             'sample' - as sample name specified in data file header. A number is preceeded to guarantee uniquenes. No order is guaranteed."
+    units {
+        q = *1/nm 1/A 1/angstrom
+        .type = choice
+        .help = Desired units of momentum transfer Q in the exported data.
+        
+    }
 }
 ''')
 

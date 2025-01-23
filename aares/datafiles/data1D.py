@@ -6,6 +6,7 @@ from numpy import dtype
 
 import h5z, h5py
 import aares
+
 import numpy
 import logging
 
@@ -13,6 +14,34 @@ detector_file_types = {'SaxspointH5': h5z.SaxspointH5,
                    #'Reduced1D': aares.datafiles.data1D.Reduced1D,
                    #'Reduced1D': Reduced1D
                    }
+
+def write_atsas(q_val, avr, std, file_name, header=[], footer=[], separator=" "):
+    """
+    Writes 1D curve in ATSAS format
+    :param q_val: q_values
+    :param avr: avreages
+    :param std: errors
+    :param file_name: output file name
+    :param header: lines to be written in the beginging
+    :param footer: lines to be written after the data
+    :param separator: column separator
+    :return:
+    """
+
+    assert len(q_val) == len(avr) == len(std)
+
+    try:
+        with open(file_name,'w') as fiout:
+            fiout.writelines(header)
+
+            for q, a, e in zip(q_val, avr, std):
+                line = separator.join(['{}']*3)+os.linesep
+                fiout.write(line.format(q,a,e))
+
+            fiout.writelines(footer)
+    except PermissionError:
+        raise aares.RuntimeErrorUser('Cannot write to {}.'.format(file_name))
+
 
 
 class Data1D_meta(ABC):
@@ -271,7 +300,8 @@ def Reduced1D_factory(base_class=(h5z.SaxspointH5,)):
     @property
     def parents(self):
         try:
-            return self['entry/data/parents']
+            #return [it.decode() for it in self['entry/data/parents']]
+            self['entry/data/parents']
         except KeyError:
             logging.debug('File does not have any parents: {}'.format(self.path))
             return None
@@ -325,6 +355,60 @@ def Reduced1D_factory(base_class=(h5z.SaxspointH5,)):
         self.update_attributes()
         super(type(self), self).write(*args, **kwargs)
 
+    def export(self, output, params=None):
+
+        if params is None:
+            params = aares.common.phil_export.extract().export
+        else:
+            aares.common.phil_export.format(params)
+
+        if self.q_value_units not in ['1/nm', '1/angstrom', '1/m']:
+            if len(self.q_value[self.q_value < 1]) > len(self.q_value):
+                in_units = '1/angstrom'
+            else:
+                in_units = '1/nm'
+            logging.info('Units of Q-value guessed as: {}'.format(in_units))
+        else:
+            in_units = self.q_value_units
+
+        if in_units == '1/angstrom':
+            in_q_multipiler = 10
+        elif in_units == '1/m':
+            in_q_multipiler = 1e-9
+        elif in_units == '1/nm':
+            in_q_multipiler = 1
+        else:
+            raise ValueError('Invalid input Q-units: {}'.format(in_units))
+
+        if params.units.q == '1/nm':
+            out_q_multipiler = 1
+        elif params.units.q == '1/angstrom' or params.units.q == '1/A':
+            out_q_multipiler = 0.1
+        else:
+            raise ValueError('Invalid output units: {}'.format(params.units.q))
+
+        q_units_multipiler = in_q_multipiler * out_q_multipiler
+
+        parents = self.parents if self.parents is not None else []
+
+        header =[f'Sample description: {self.sample_name}\n',
+                 f'Sample: c= 0mg/ml Code:\n',
+                 'Parent(s):' + ' '.join(parents),
+                 '\n']
+
+        footer = ['range-from: 1\n',
+                  f'range-to: {len(self.q_values)}\n',
+                  f'creator: {__name__}\n',
+                  f'creator-version: {aares.__version__}',]
+        footer.extend('\nparent: '.join(['']+parents))
+
+        write_atsas(self.q_values*q_units_multipiler, self.intensity, self.intensity_sigma,
+                                 file_name=output,
+                                 header=header,
+                                 footer=footer,)
+
+
+
     cls_1D = type("Data1D", (base_class,),
                   {
                       "__init__":        __init__,
@@ -341,6 +425,7 @@ def Reduced1D_factory(base_class=(h5z.SaxspointH5,)):
                       "write":           write,
                       "add_process":     add_process,
                       "skip_entries":    skip_entries,
+                      "export":          export,
                   })
     return cls_1D
 
