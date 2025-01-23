@@ -21,6 +21,10 @@ def test_Reduced1D_write():
     hd1.q_value_units = "1/angstrom"
     hd1.intensity_units= "1/cm"
     hd1.scale = 45.4678
+    hd1.relative_molecular_mass = 12000.0
+    hd1.sample_type = 'sample+buffer'
+    hd1.concentration = 2.48
+    hd1.concentration_units = "M"
 
     hd1.intensity
     hd1.intensity_sigma
@@ -30,6 +34,8 @@ def test_Reduced1D_write():
     hd1.intensity_units
     hd1.scale
     hd1.parents
+    assert hd1.concentration == 2.48
+    assert hd1.relative_molecular_mass == 12000.0
     hd1.write('AgBeh_826mm_reduced.h5')
     hd1.export('AgBeh_826mm_reduced.dat')
 

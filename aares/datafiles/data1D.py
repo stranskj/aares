@@ -320,6 +320,66 @@ def Reduced1D_factory(base_class=(h5z.SaxspointH5,)):
         dts =  h5z.DatasetH5(source_dataset=numpy.array(arr_out, dtype='S'), name='parents')
         self['entry/data/parents'] = dts
 
+    @property
+    def sample_type(self):
+        try:
+            return self['entry/sample/type'].item().decode()
+        except KeyError:
+            logging.debug('File does not have any sample types: {}'.format(self.path))
+            return None
+
+    @sample_type.setter
+    def sample_type(self, val):
+        if val not in ['sample', 'sample+can', 'can', 'sample+buffer', 'buffer', 'calibration sample',
+                   'normalisation sample', 'simulated data', 'none', 'sample environment']:
+            raise ValueError('Type is not of valid value: {}'.format(val))
+
+        dts = h5z.DatasetH5(source_dataset=numpy.array(val, dtype='S'), name='type')
+        self['entry/sample/type'] = dts
+
+    @property
+    def relative_molecular_mass(self):
+        try:
+            return self['entry/sample/relative_molecular_mass'][0]
+        except KeyError:
+            logging.debug('File does not have any sample types: {}'.format(self.path))
+            return None
+
+    @relative_molecular_mass.setter
+    def relative_molecular_mass(self, val):
+        dts = h5z.DatasetH5(source_dataset=numpy.array([val]), name='relative_molecular_mass')
+        dts.attrs['units'] = 'Da'
+        self['entry/sample/relative_molecular_mass'] = dts
+
+    @property
+    def concentration(self):
+        try:
+            return self['entry/sample/concentration'][0]
+        except KeyError:
+            logging.debug('Concentration is not set: {}'.format(self.path))
+            return None
+
+    @concentration.setter
+    def concentration(self, val):
+        dts = h5z.DatasetH5(source_dataset=numpy.array([val]), name='concentration')
+        dts.attrs['units'] = 'mg/ml'
+        self['entry/sample/concentration'] = dts
+
+    @property
+    def concentration_units(self):
+        try:
+            return self['entry/sample/concentration'].attrs['units']
+        except KeyError:
+            logging.debug('Concentration is not set: {}'.format(self.path))
+            return None
+
+    @concentration_units.setter
+    def concentration_units(self, val):
+        try:
+            self['entry/sample/concentration'].attrs['units'] = val
+        except KeyError:
+            raise AttributeError('Concentration is not set: {}'.format(self.path))
+
     def update_attributes(self):
         '''
         Updates file attributes
@@ -424,6 +484,10 @@ def Reduced1D_factory(base_class=(h5z.SaxspointH5,)):
                       "add_process":     add_process,
                       "skip_entries":    skip_entries,
                       "export":          export,
+                      "relative_molecular_mass": relative_molecular_mass,
+                      "sample_type":     sample_type,
+                      "concentration":   concentration,
+                      "concentration_units": concentration_units,
                   })
     return cls_1D
 
