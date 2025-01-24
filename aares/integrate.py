@@ -464,7 +464,8 @@ def process_file(header, file_out, frames=None, export=None, file_properties=Non
 
     if file_properties.concentration is not None:
         h5r_out.concentration = file_properties.concentration
-        h5r_out.concentration_units = file_properties.concentration_units
+        if file_properties.concentration_units is not None:
+            h5r_out.concentration_units = file_properties.concentration_units
 
     h5r_out.write(file_out)
     logging.debug('File {} reduced to file  {}.'.format(header.path, file_out))

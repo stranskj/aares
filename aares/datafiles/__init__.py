@@ -99,7 +99,7 @@ group_phil_str = '''
         .type = float
         .help = "Sample concentration."
         
-        concentration_units = 'mg/mL'
+        concentration_units = None 
         .type = str
         .help = "Sample concentration unit."
     }

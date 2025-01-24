@@ -362,7 +362,7 @@ def Reduced1D_factory(base_class=(h5z.SaxspointH5,)):
     @concentration.setter
     def concentration(self, val):
         dts = h5z.DatasetH5(source_dataset=numpy.array([val]), name='concentration')
-        dts.attrs['units'] = 'mg/ml'
+        dts.attrs['units'] = 'mg/mL'
         self['entry/sample/concentration'] = dts
 
     @property
