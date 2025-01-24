@@ -382,7 +382,8 @@ def integrate_mp(frame_arr, bin_masks, nproc=None, non_negative=False):
     return averages, stdev, num, num_not_masked
 
 
-def process_file(header, file_out, frames=None, export=None, reduction = None,
+def process_file(header, file_out, frames=None, export=None, file_properties=None,
+                 reduction = None,
                  bin_masks=None,
                  q_val=None,
                  scale=None,
@@ -390,7 +391,9 @@ def process_file(header, file_out, frames=None, export=None, reduction = None,
                  error_model='3d',
                  nproc=None,
                  by_frame=False,
-                 non_negative=False):
+                 non_negative=False,
+                 export_settings=None,
+                 ):
 
     aares.my_print(header.path)
 
@@ -404,6 +407,9 @@ def process_file(header, file_out, frames=None, export=None, reduction = None,
             logging.info('Only {} frames were used from: {}'.format(numpy.size(data, axis=0), header.path))
         except IndexError as err:
             raise aares.RuntimeErrorUser(repr(err)+'\nError while processing file: {}\nCould not select specified frames. Note that frame indices are 0-based.'.format(header.path))
+
+    if file_properties is None:
+        file_properties = aares.datafiles.file_object()
 
     averages, stddev, num, non_masked = integrate_mp(data, bin_masks=bin_masks, nproc=nproc, non_negative=non_negative)
     if scale is not None:
@@ -448,13 +454,27 @@ def process_file(header, file_out, frames=None, export=None, reduction = None,
     h5r_out.scale = frame_scale*transmittance
     h5r_out.add_process(name='reduction', description='Data are radially and per pixel averaged.')
 
+    if file_properties.is_background:
+        h5r_out.sample_type = 'buffer'
+        h5r_out.concentration = 0.0
+    elif file_properties.background is not None:
+        h5r_out.sample_type = 'sample+buffer'
+    else:
+        h5r_out.sample_type = 'none'
+
+    if file_properties.concentration is not None:
+        h5r_out.concentration = file_properties.concentration
+        h5r_out.concentration_units = file_properties.concentration_units
+
     h5r_out.write(file_out)
     logging.debug('File {} reduced to file  {}.'.format(header.path, file_out))
 
     if export is not None:
-        aares.export.write_atsas(q_val, averages,stddev,
-                                  file_name=export,
-                                  header=['# {}\n'.format(header.path)])
+
+        h5r_out.export(export, export_settings)
+        # aares.export.write_atsas(q_val, averages,stddev,
+        #                           file_name=export,
+        #                           header=['# {}\n'.format(header.path)])
         logging.debug('File {} exported to file  {}.'.format(header.path, export))
 
 
@@ -575,6 +595,7 @@ def integrate_group(group, data_dictionary, job_control=None, output=None, expor
                               nproc=job_control.threads,
                               by_frame=False,
                               non_negative=params.reduction.pixel_mask_per_frame,
+                              export_settings=export
                               )
 
     #files = [data_dictionary[fi.path] for fi in group.scope_extract.file]
@@ -584,12 +605,14 @@ def integrate_group(group, data_dictionary, job_control=None, output=None, expor
     files_out = []
     frames = []
     export_finames = []
+    properties = []
     for fi in group.scope_extract.file:
         files.append(data_dictionary[fi.path])
 
         file_out_name = os.path.join(output.directory, fi.name + '.h5r') # TODO: use info from export or so
         files_out.append(file_out_name)
         fi.path = file_out_name
+        properties.append(fi)
 
         frames.append(fi.frames)
         if output.export:
@@ -602,6 +625,7 @@ def integrate_group(group, data_dictionary, job_control=None, output=None, expor
                        files_out,
                        frames,
                        export_finames,
+                       properties,
                        nchunks=job_control.jobs
                        )
 

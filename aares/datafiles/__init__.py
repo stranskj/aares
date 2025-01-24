@@ -94,6 +94,14 @@ group_phil_str = '''
         background = None
         .type = str
         .help = "Which background file to use. The file is specified by its `file.name`"
+        
+        concentration = None
+        .type = float
+        .help = "Sample concentration."
+        
+        concentration_units = 'mg/mL'
+        .type = str
+        .help = "Sample concentration unit."
     }
 '''
 group_phil = phil.parse(group_phil_str)

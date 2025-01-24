@@ -449,8 +449,12 @@ def Reduced1D_factory(base_class=(h5z.SaxspointH5,)):
 
         parents = self.parents if self.parents is not None else []
 
+        if self.concentration is not None:
+            conc_str = f'{self.concentration} {self.concentration_units}'
+        else:
+            conc_str = ''
         header =[f'Sample description: {self.sample_name}\n',
-                 f'Sample: c= 0 mg/ml Code:\n',
+                 f'Sample: c= {conc_str} Code:\n',
                  'Parent(s): ' + ' '.join(parents),
                  '\n']
 

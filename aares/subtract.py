@@ -98,7 +98,7 @@ def subtract_file(data, background, output, export=None):
         background = aares.datafiles.read_file(background)
 
     subtracted = subtract_reduced(data, background)
-
+    subtracted.sample_type = 'sample'
     subtracted.write(output)
 
     if export is not None:
