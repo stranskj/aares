@@ -124,7 +124,12 @@ def subtract_group(group, files_dict, output_dir, export=None):
             continue
 
         work_file = fi.path
-        background =files_by_name[fi.background].path
+
+        try:
+            background =files_by_name[fi.background].path
+        except KeyError:
+            logging.warning('File does not have associated background: {}, {}'.format(name, fi.path))
+            continue
 
         logging.info('Processing: {}\nSubtracting background ({}) from file {}'.format(name,background, work_file))
         output_name = os.path.join(output_dir,fi.name+'.h5s')
