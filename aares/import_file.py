@@ -34,7 +34,8 @@ search_string = None
 .multiple = True
 .type = str
 
-suffix = h5z h5
+suffix = 'h5z' 'h5'
+.type = strings
 .help = Suffixes to search for. Only HDF5 files are used by the software.
 
 output = files.fls
