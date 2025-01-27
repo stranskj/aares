@@ -135,6 +135,11 @@ AAres tools
                                      description= cls.long_description,
                                      default_scope_description=True)
             ftool.write(md)
+
+            ftool.write('\n---------\n\n## Full PHIL\n\n')
+            ftool.write('```\n')
+            ftool.write(cls.system_phil.as_str(attributes_level=0, expert_level=3))
+            ftool.write('```\n')
             # ftool.write(f'# {script_name}\n')
             # ftool.write('#'*len(script_name)+'\n\n')
             # ftool.write(data['classes'][0].long_description)
