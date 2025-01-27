@@ -1,4 +1,4 @@
-import freephil_docs as phildoc
+import freephil_docs.markdown as phildoc
 
 import os
 import re
@@ -110,17 +110,36 @@ def create_docs(pyproject_path = "pyproject.toml", job_module_name="aares.Job", 
 
     aares.create_directory(out_path)
 
+    #list of tools
     with open(os.path.join(out_path,"List_of_tools.md"),'w') as flist:
         flist.write('''
 AAres tools
 ===========
        
 ''')
-
-        for script_name, data in extracted.items():
+        for script_name, data in sorted(extracted.items()):
             for cls in data["classes"]:
                 print(script_name)
-                flist.write(f'* **{script_name}**: {cls.short_description}\n')
+                flist.write(f'* **[{script_name}]({script_name}.md)**: {cls.short_description}\n')
+
+    # tools PHIL documentation
+
+    for script_name, data in extracted.items():
+        fi_name = f"{script_name}.md"
+        with open(os.path.join(out_path,fi_name),'w') as ftool:
+            cls = data["classes"][0]
+            if cls.system_phil == '':
+                continue
+            md = phildoc.phil_to_markdown(cls.system_phil,
+                                     title= script_name,
+                                     description= cls.long_description,
+                                     default_scope_description=True)
+            ftool.write(md)
+            # ftool.write(f'# {script_name}\n')
+            # ftool.write('#'*len(script_name)+'\n\n')
+            # ftool.write(data['classes'][0].long_description)
+            # ftool.write('\n')
+
 
 
 
