@@ -7,6 +7,8 @@ import importlib
 import inspect
 import ast
 
+import aares
+
 
 class JobClassFinder(ast.NodeVisitor):
     """AST visitor to find classes inheriting from 'Job', even with module imports."""
@@ -102,8 +104,27 @@ def extract_functions_from_pyproject(pyproject_path,  job_module_name="aares.Job
     return results
 
 
-# Example usage
-pyproject_path = "pyproject.toml"  # Path to your pyproject.toml
+def create_docs(pyproject_path = "pyproject.toml", job_module_name="aares.Job", out_path = "wiki"):
 
-extracted = extract_functions_from_pyproject(pyproject_path)
+    extracted = extract_functions_from_pyproject(pyproject_path, job_module_name)
 
+    aares.create_directory(out_path)
+
+    with open(os.path.join(out_path,"List_of_tools.md"),'w') as flist:
+        flist.write('''
+AAres tools
+===========
+       
+''')
+
+        for script_name, data in extracted.items():
+            for cls in data["classes"]:
+                print(script_name)
+                flist.write(f'* **{script_name}**: {cls.short_description}\n')
+
+
+
+if __name__ == "__main__":
+    create_docs(out_path='test-wiki')
+
+    pass
