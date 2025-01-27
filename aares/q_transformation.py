@@ -15,7 +15,7 @@ phil_core_str = '''
 q_transformation {
 units = *nm A
 .type = choice
-.help = 'Units to be used. The length of scattering vector (:math:`q`) is calculated as :math:`4\pi*sin \\theta/\lambda` in inverse units of choice.'
+.help = 'Units to be used. The length of scattering vector (:math:`q`) is calculated as :math:`4\\pi*sin \\theta/\\lambda` in inverse units of choice.'
 
 geometry {
     beam_center_px = None

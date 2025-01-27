@@ -7,7 +7,7 @@ import os
 import logging
 from aares import my_print
 import sys
-import pkg_resources
+
 import importlib
 import importlib.metadata
 import logging
