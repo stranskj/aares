@@ -850,6 +850,11 @@ class ReductionBins(h5z.SaxspointH5):
 
 
 class JobReduction(aares.Job):
+    long_description = ''
+
+    short_description = prog_short_description
+
+    system_phil = phil_job_core
 
     def __set_meta__(self):
         super().__set_meta__()
@@ -1125,9 +1130,15 @@ class DrawBinsJob(aares.Job):
     Run class based on generic saxpoint run class
     """
 
+    long_description = ''
+
+    short_description = 'Draw bin masks to PNG.'
+
+    system_phil = phil_draw_bins
+
     def __set_meta__(self):
         super().__set_meta__()
-        self._program_short_description = "Draw pixels assigned to the Q-bins as a PNG."
+        self._program_short_description = self.short_description
 
     def __set_system_phil__(self):
         self.system_phil = phil_draw_bins

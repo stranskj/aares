@@ -478,6 +478,11 @@ class ArrayQ(h5z.SaxspointH5):
 
 
 class JobQtrasform(aares.Job):
+    long_description = ''
+
+    short_description = prog_short_description
+
+    system_phil = phil_core
 
     def __set_meta__(self):
         super().__set_meta__()
