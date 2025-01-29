@@ -104,11 +104,17 @@ def extract_functions_from_pyproject(pyproject_path,  job_module_name="aares.Job
     return results
 
 
-def create_docs(pyproject_path = "pyproject.toml", job_module_name="aares.Job", out_path = "wiki"):
+def create_docs(pyproject_path = "pyproject.toml", job_module_name="aares.Job", out_path = "wiki", tools_path=None):
 
     extracted = extract_functions_from_pyproject(pyproject_path, job_module_name)
 
     aares.create_directory(out_path)
+
+    if tools_path is None:
+        tools_path = "Tools"
+    full_tools_path = os.path.join(out_path, tools_path)
+
+    aares.create_directory(full_tools_path)
 
     #list of tools
     with open(os.path.join(out_path,"List_of_tools.md"),'w') as flist:
@@ -120,13 +126,13 @@ AAres tools
         for script_name, data in sorted(extracted.items()):
             for cls in data["classes"]:
                 print(script_name)
-                flist.write(f'* **[{script_name}]({script_name}.md)**: {cls.short_description}\n')
+                flist.write(f'* **[{script_name}]({tools_path}/{script_name}.md)**: {cls.short_description}\n')
 
     # tools PHIL documentation
 
     for script_name, data in extracted.items():
         fi_name = f"{script_name}.md"
-        with open(os.path.join(out_path,fi_name),'w') as ftool:
+        with open(os.path.join(full_tools_path,fi_name),'w') as ftool:
             cls = data["classes"][0]
             if cls.system_phil == '':
                 continue
@@ -149,6 +155,6 @@ AAres tools
 
 
 if __name__ == "__main__":
-    create_docs(out_path='test-wiki')
+    create_docs(out_path='wiki')
 
     pass
