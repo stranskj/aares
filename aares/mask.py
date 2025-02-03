@@ -18,7 +18,7 @@ import logging
 
 __all__ = []
 __version__ = aares.__version__
-prog_short_description = 'Generates frame mask'
+
 
 import numpy as np
 import math
@@ -28,12 +28,37 @@ import freephil as phil
 import h5z
 import os
 
+
+prog_short_description = 'Generates frame mask'
+
+prog_long_description = '''
+Mask job generates a detector mask based on several sources:
+
+ * Detector mask
+ * Beamstop postion
+ * Custom mask
+ 
+The detector mask is genereated from known geometry of used detector. The information can be read either from data file (`h5z` or `h5`) or using FLS-file. Typically, pixels between modules and at the edges are excluded. If the data file contains pixel mask, it is also used.
+
+The beamstop mask can be automatically generated: to enable it, set beamstop size bigger than 0 (for example: `beamstop.size=2`. It is expected, that the shape is rectangle with rounded top. In automatic mode, the beamstop tilt is calculated from beamcenter position and asumption, that bottom of the beamstop is in the middle of the detector. 
+
+Custom mask can be provided using a PNG file. The job parameters define, how the file should be interpreted. In the default setup, PNG with transparency (alpha channel) is expected, and the transparent pixels are  masked. This can be easily achieved using GIMP:
+
+ 1. Open a PNG with 2D image created using `aares.draw2d`
+ 2. Using selection, select the unwanted pixels and hit `Delete` key.
+ 3. Export the result into new PNG file.
+ 
+The output is new PNG file, where white pixels are excluded and the transparent used. This can be used for checking the mask, when the PNG with the mask is loaded as a new layer with the 2D image (in GIMP `File -> Open as layers`).
+
+In the each masking step, absolute number of masked pixels and percentage of masked detector area is reported.
+'''
+
 phil_core = phil.parse('''
 mask {
 file = None
 .type = path
 #.multiple = True
-#.help = File with a custom mask. It can be mask in H5-file, or PNG (than is eqiuvalent to custom.file). If this is H5 or H5Z data file, pixel_mask is extracted.
+#.help = File with a custom mask. It can be mask in H5-file, or PNG (than is equivalent to custom.file). If this is H5 or H5Z data file, pixel_mask is extracted.
 .help = File used to extract information about the experiment.
 
 output = mask.png
@@ -57,7 +82,7 @@ beamstop
     .help = Center of the beamstop in pixels. If None, primary beam position is used. 
     
     semitransparent = None
-    .help = Hole cut-out in the mask for primary, in case semitransparent beamstop was used. Pick slightly smaller number than beamstop size.
+    .help = Hole cut-out in the mask for primary beam, in case semitransparent beamstop was used. Pick slightly smaller number than beamstop size.
     .type = float
 }
 
@@ -458,7 +483,7 @@ class JobMask(aares.Job):
     Run class based on generic AAres run class
     """
 
-    long_description = ''
+    long_description = prog_long_description
 
     short_description = prog_short_description
 

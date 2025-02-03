@@ -11,6 +11,10 @@ import os
 
 prog_short_description = 'Transforms file Q-space coordinates'
 
+prog_long_description = '''
+This job perform Q-transformation, e.g. assigns each pixels of the detector with appropriate Q-value. At this point, only lengths of the Q-vectors are used. The calculation is performed individually for each group of files with the same geometry. The Q-values are stored in `*.q_space.h5a`.
+'''
+
 phil_core_str = '''
 q_transformation {
 units = *nm A

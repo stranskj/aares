@@ -34,6 +34,61 @@ from aares.datafiles import phil_files
 
 prog_short_description = 'Performs data reduction from 2D to 1D.'
 
+prog_long_description = '''
+The job which performs actual 2D reduction. The process is divided in the following steps:
+ 1. Binning
+ 2. Intensity and experimental errors estimation
+ 3. Normalization
+ 4. Export
+ 
+Binning
+-------
+
+In this step, each detector pixel is assigned to a bin based on its Q-value. Currently, only bins equidistant in the Q-space are supported. The user can specify Q-range to be used (`reduction.q_range`) and number of bins. If the number of bins is not specified, it is determined as 1/sqrt(2) of distance between beam position and edge of the detector in pixels.
+
+The assignment of the bins is stored in `*.bins.h5a`. The bins can be visualized using `aares.draw2d.bins`
+
+Intensity and experimental error estimation
+----------------
+
+The typical SAXS data are collected as series of frames, which in total cover the full exposure of the sample. For example, 10 min exposure can be split to 10 frames per 60 seconds.
+
+The intensity of given bin as calculated as average intensity of all pixels assigned with the same bin number. This always happens within and across the frames at the same time. There is mathematically no difference to separating the steps.
+
+The experimental errors can be estimated using different methods:
+ * **3d** - the error is estimated as standard deviation of intensity of pixels in given bin within and across the frames at once.
+ * **pixel** - the error is estimated as standard deviation of intensity of pixels at the same position (e.g. same XY on detector), followed with error propagation for pixels within the same bin. This process is equivalent to first averaging the frames and second reducing to 1D.
+ * **poisson** - the error is estimated with assumption, that intensity counts follow Poisson distribution, e.g. the error is square root of average intensity of the bin 
+
+Normalization
+----------
+
+The intensity can be normalized to transmittance, primary beam fluctuation and background.
+
+For transimttance normalization, the file headers has to contain flux measurements with and without the sample in the primary beam. For SAXSpoint, this mean having "Transmittance measurement" using "Eiger detector" enabled in experiment set up.
+
+The primary beam fluctuation and background correction is currently either or, as the background correction hopes to do the same. It is done by specifying, which portion of frame should remain constant across the experiments. If you have semitransparent (or no) beamstop, select the area of the primary beam (the detector mask has to be ready for this). If you want to normalize to background, select the regions close to the detector edge. The region for normalization can be specified as Q-range (you probably know, where the background is in Q-values) or in real space (you roughly know the area based on beamstop  size).
+
+Both normalization procedures are independent and multiplicative.
+
+Export
+------
+
+Currently, export to format compatible with ATSAS package is supported (DAT files). This is text file with space separated columns: q-vaules, intensity, error estimates
+
+Frame range
+-----------
+
+Using the `frames` keyword in FLS file, it is possible to select a subset of frames from the data file for processing.
+
+
+Per-frame reduction
+--------
+
+The  data reduction can be also performed in per frame basis. With this, individual frames are reduced and exported as numbered series of DAT files. This can be used for some analysis of data consistency, for example using Data comparison tool in Primus.
+
+'''
+
 phil_core_str = '''
 reduction
 .help = Parameters controlling the reduction from 2D to 1D
@@ -850,7 +905,7 @@ class ReductionBins(h5z.SaxspointH5):
 
 
 class JobReduction(aares.Job):
-    long_description = ''
+    long_description = prog_long_description
 
     short_description = prog_short_description
 
