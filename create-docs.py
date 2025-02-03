@@ -8,7 +8,7 @@ import inspect
 import ast
 
 import aares
-
+import aares.datafiles
 
 class JobClassFinder(ast.NodeVisitor):
     """AST visitor to find classes inheriting from 'Job', even with module imports."""
@@ -152,7 +152,18 @@ AAres tools
             # ftool.write('\n')
 
 
+    # FLS file documentation
 
+    with open(os.path.join(out_path,'FLS_file.md'), 'w') as flist:
+        md = phildoc.phil_to_markdown(aares.datafiles.phil_files,
+                                      title= 'FLS file description',
+                                      description='This file hold user accesible/editable information about the data files in use. The files are devided into groups by common experimental geometry. The order of files with in the grou deos not matter.',
+                                      default_scope_description=True)
+        flist.write(md)
+        flist.write('\n---------\n\n## Full PHIL\n\n')
+        flist.write('```\n')
+        flist.write(aares.datafiles.phil_files.as_str(attributes_level=0, expert_level=3))
+        flist.write('```\n')
 
 if __name__ == "__main__":
     create_docs(out_path='wiki')
