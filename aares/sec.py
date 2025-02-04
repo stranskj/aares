@@ -229,6 +229,13 @@ def run(params):
 
 
 class JobSec(aares.Job):
+
+    long_description = ''
+
+    short_description = prog_short_description
+
+    system_phil = phil_core
+
     def __set_meta__(self):
         '''
         Sets various package metadata

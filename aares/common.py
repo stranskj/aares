@@ -228,13 +228,19 @@ class Job(ABC):
         if run:
             self.__run__(*args, **kwargs)
 
+    long_description = ''
+
+    short_description = ''
+
+    system_phil = ''
+
     @abstractmethod
     def __set_meta__(self):
         '''
         Sets various package metadata
         '''
 
-        self._program_short_description = 'Another angular REduction for Saxs'
+        self._program_short_description = self.short_description
 
         self._program_name = os.path.basename(sys.argv[0])
         self._program_version = __version__

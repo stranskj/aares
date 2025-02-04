@@ -30,9 +30,63 @@ import os, logging
 import freephil as phil
 import tqdm
 
-from aares.datafiles import phil_files
 
 prog_short_description = 'Performs data reduction from 2D to 1D.'
+
+prog_long_description = '''
+The job which performs actual 2D reduction. The process is divided in the following steps:
+ 1. Binning
+ 2. Intensity and experimental errors estimation
+ 3. Normalization
+ 4. Export
+ 
+Binning
+-------
+
+In this step, each detector pixel is assigned to a bin based on its Q-value. Currently, only bins equidistant in the Q-space are supported. The user can specify Q-range to be used (`reduction.q_range`) and number of bins. If the number of bins is not specified, it is determined as 1/sqrt(2) of distance between beam position and edge of the detector in pixels.
+
+The assignment of the bins is stored in `*.bins.h5a`. The bins can be visualized using `aares.draw2d.bins`
+
+Intensity and experimental error estimation
+----------------
+
+The typical SAXS data are collected as series of frames, which in total cover the full exposure of the sample. For example, 10 min exposure can be split to 10 frames per 60 seconds.
+
+The intensity of given bin as calculated as average intensity of all pixels assigned with the same bin number. This always happens within and across the frames at the same time. There is mathematically no difference to separating the steps.
+
+The experimental errors can be estimated using different methods:
+ * **3d** - the error is estimated as standard deviation of intensity of pixels in given bin within and across the frames at once.
+ * **pixel** - the error is estimated as standard deviation of intensity of pixels at the same position (e.g. same XY on detector), followed with error propagation for pixels within the same bin. This process is equivalent to first averaging the frames and second reducing to 1D.
+ * **poisson** - the error is estimated with assumption, that intensity counts follow Poisson distribution, e.g. the error is square root of average intensity of the bin 
+
+Normalization
+----------
+
+The intensity can be normalized to transmittance, primary beam fluctuation and background.
+
+For transimttance normalization, the file headers has to contain flux measurements with and without the sample in the primary beam. For SAXSpoint, this mean having "Transmittance measurement" using "Eiger detector" enabled in experiment set up.
+
+The primary beam fluctuation and background correction is currently either or, as the background correction hopes to do the same. It is done by specifying, which portion of frame should remain constant across the experiments. If you have semitransparent (or no) beamstop, select the area of the primary beam (the detector mask has to be ready for this). If you want to normalize to background, select the regions close to the detector edge. The region for normalization can be specified as Q-range (you probably know, where the background is in Q-values) or in real space (you roughly know the area based on beamstop  size).
+
+Both normalization procedures are independent and multiplicative.
+
+Export
+------
+
+Currently, export to format compatible with ATSAS package is supported (DAT files). This is text file with space separated columns: q-vaules, intensity, error estimates
+
+Frame range
+-----------
+
+Using the `frames` keyword in FLS file, it is possible to select a subset of frames from the data file for processing.
+
+
+Per-frame reduction
+--------
+
+The  data reduction can be also performed in per frame basis. With this, individual frames are reduced and exported as numbered series of DAT files. This can be used for some analysis of data consistency, for example using Data comparison tool in Primus.
+
+'''
 
 phil_core_str = '''
 reduction
@@ -909,6 +963,11 @@ class ReductionBins(h5z.SaxspointH5):
 
 
 class JobReduction(aares.Job):
+    long_description = prog_long_description
+
+    short_description = prog_short_description
+
+    system_phil = phil_job_core
 
     def __set_meta__(self):
         super().__set_meta__()
@@ -1125,103 +1184,7 @@ def test_bins_draw2d():
     bins.draw2d()
     assert os.path.isdir('q_images')
 
-phil_draw_bins = phil.parse("""
-include scope aares.common.phil_input_files
-    
-    input {
-    file_name = None
-    #.multiple = True
-    .type = path
-    .help =  File with the data to be processed. It needs to be explicit file name. Use "aares.import" for more complex file search and handling.
-    }
-    
-    output {
-        directory = 'q_images'
-        .type = path
-        .help = Output folder for the processed data
-        prefix = ""
-        .type = str
-        .help = Prefix to the file names
-        clear = True
-        .type = bool
-        .help = Clear output folder, if exists
-    }
-""", process_includes=True)
 
-class DrawBinsJob(aares.Job):
-    """
-    Run class based on generic saxpoint run class
-    """
-
-    def __set_meta__(self):
-        super().__set_meta__()
-        self._program_short_description = "Draw pixels assigned to the Q-bins as a PNG."
-
-    def __set_system_phil__(self):
-        self.system_phil = phil_draw_bins
-
-    def __help_epilog__(self):
-        pass
-
-    def __argument_processing__(self):
-        pass
-
-    def __process_unhandled__(self):
-        for param in self.unhandled:
-            if aares.datafiles.is_fls(param):
-                self.params.input_files = param
-            elif ReductionBins.is_type(param):
-                self.params.input.file_name = param
-            else:
-                raise aares.RuntimeErrorUser('Unknown file type: {}'.format(param))
-
-    def __worker__(self):
-
-        jobs = []
-
-        if self.params.input.file_name is not None:
-            jobs.append((self.params.input.file_name, self.params.output.directory))
-        elif self.params.input_files is not None:
-            files = aares.datafiles.DataFilesCarrier(file_phil=self.params.input_files, mainphil=phil_core)
-
-            for group in files.file_groups:
-                if ReductionBins.is_type(group.group_phil.reduction.file_bin_masks):
-                    jobs.append((group.group_phil.reduction.file_bin_masks, self.params.output.directory+'_'+group.name))
-                else:
-                    logging.warning('Group {} has no binning file assigned.'.format(group.name))
-        else:
-            aares.my_print('Nothing to process.')
-            sys.exit(0)
-
-        for fi, outdir in jobs:
-            bins = ReductionBins(fi)
-            bins.draw2d(output_dir=outdir, clear=self.params.output.clear)
-            aares.my_print('Images of individual bins are draw in folder: {}'.format(outdir))
-
-def draw_bins():
-    import sys
-    job = DrawBinsJob()
-    sys.exit(job.job_exit)
-
-def draw_bins_old():
-    #TODO: re do this properly, ideally after lib-bin refactorisation
-
-    import sys
-    aares.my_print("AAres draw bins")
-
-    fin = sys.argv[1]
-
-    if not ReductionBins.is_type(fin):
-        logging.error('This is not file with Q-bins. Search for suffix ".bins.h5a"')
-        sys.exit(1)
-
-    bins = ReductionBins(fin)
-    bins.draw2d()
-
-    aares.my_print('Images of individual bins are draw in folder "q_images".')
-    aares.my_print('\nFinished.')
-
-    sys.exit(0)
 
 
 def main():

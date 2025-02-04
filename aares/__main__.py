@@ -7,7 +7,7 @@ import os
 import logging
 from aares import my_print
 import sys
-import pkg_resources
+
 import importlib
 import importlib.metadata
 import logging
@@ -75,6 +75,12 @@ class MainJob(aares.Job):
     """
     Run class based on generic AAres run class
     """
+
+    long_description = ''
+
+    short_description = prog_short_description
+
+    system_phil = '' #phil_core
 
     def __argument_processing__(self):
         pass

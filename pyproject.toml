@@ -48,5 +48,5 @@ version = {attr = "aares.version.version"}
   "aares.q_transform" = "aares.q_transformation:main"
   "aares.plot" = "aares.plot:main"
   "aares.merge" = "aares.merge:main"
-  "aares.draw2d.bins" = "aares.integrate:draw_bins"
+  "aares.draw2d.bins" = "aares.draw2d_bins:main"
   "aares.subtract" = "aares.subtract:main"
