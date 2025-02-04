@@ -36,9 +36,7 @@ class DrawBinsJob(aares.Job):
     Run class based on generic saxspoint run class
     """
 
-    long_description = '''
-    This tool visualises bin masks used for the data reduction. For each bin in Q-values, PNG file is created. This can be useful for checking which pixels are used around the beamstop.
-    '''
+    long_description = 'This tool visualises bin masks used for the data reduction. For each bin in Q-values, PNG file is created. This can be useful for checking which pixels are used around the beamstop.'
 
     short_description = prog_short_description
 

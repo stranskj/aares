@@ -1,6 +1,6 @@
 import freephil_docs.markdown as phildoc
 
-import os
+import os, sys
 import re
 import tomllib
 import importlib
@@ -168,4 +168,4 @@ AAres tools
 if __name__ == "__main__":
     create_docs(out_path='wiki')
 
-    pass
+    sys.exit(0)
