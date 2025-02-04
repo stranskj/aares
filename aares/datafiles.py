@@ -5,14 +5,12 @@ import math
 import os
 import logging
 import re
-import datetime
 
 import freephil as phil
 
 import aares
 import h5z
-from aares import power as pwr, my_print
-
+from aares import power as pwr
 #from aares.import_file import phil_core as import_phil
 
 group_phil_str = '''
@@ -54,7 +52,7 @@ group_phil_str = '''
         
         frames = None
         .type = str
-        #.help = "Use only selected frames from the file. The frames are 0-indexed. The format is comma-separated list of frames or frame ranges, range boundaries are column-separated, left is inclusive, eight is exclusive. Valid examples: [1,2,3, 8,9] [:3, 6:9, 12:] [3,4, 8:12]"
+        #.help = "Use only selected frames from the file. The frames are 0-indexed. The format is comma-separated list of frames or frame ranges, range boundaries are column-separated, left is inclusive, right is exclusive. Valid examples: [1,2,3, 8,9] [:3, 6:9, 12:] [3,4, 8:12]"
         
         is_background = None
         .type = bool
@@ -818,9 +816,6 @@ class DataFilesCarrier:
 
         self.files_dict = sorted_dict
 
-    def detect_background(self, pattern='buffer', search_in='name'):
-        for group in self.file_groups:
-            detect_background(group, pattern, search_in=search_in)
 
     def write_groups(self,file_out='files.fls', update=True):
         '''
@@ -882,7 +877,7 @@ class DataFilesCarrier:
         except PermissionError:
             aares.RuntimeErrorUser('Cannot write to {}. Permission denied.'.format(file_out))
 
-    def read_headers_from_file(self, file_in: object = None) -> object:
+    def read_headers_from_file(self,file_in=None):
         '''
         Reads the serialized headers from a file
         :param file_in:
@@ -914,43 +909,3 @@ class DataFilesCarrier:
         for item in input_group[self._master_group_name].values():
             header = h5z.SaxspointH5(item)
             self.files_dict[header.path] = header
-
-    def assign_background(self, method='time'):
-        '''
-        Assign background file to each file.
-
-        :param files: Files to be processed
-        :type files: DataFilesCarrier
-        '''
-
-        if method == 'time':
-            for group in self.file_groups:
-                my_print('Assigning background files for group {}'.format(group.name))
-                buffers = {fi.name: datetime.datetime.fromisoformat(self.files_dict[fi.path].file_time_iso)
-                           for fi in group.file if fi.is_background}
-                if len(buffers) == 0:
-                    logging.warning('No background files found for this group.')
-                    continue
-                logging.info('Found {} background files.'.format(len(buffers)))
-                for fi in group.file:
-                    if fi.is_background:
-                        continue
-                    file_time = datetime.datetime.fromisoformat(self.files_dict[fi.path].file_time_iso)
-                    for buff, tm in buffers.items():
-                        if tm < file_time:
-                            best_buffer = buff
-                            buffer_time = tm
-                            break
-                    else:
-                        logging.warning('No suitable background for this file: {}'.format(fi.name))
-                        continue
-
-                    for buff, tm in buffers.items():
-                        if buffer_time < tm < file_time:
-                            best_buffer = buff
-                            buffer_time = tm
-
-                    fi.background = best_buffer
-
-        else:
-            raise NotImplementedError('Unknown method')

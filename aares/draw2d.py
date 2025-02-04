@@ -225,6 +225,12 @@ def frame_to_png(frame, fiout, Imin=0, Imax=1, cmap='jet'):
     # plt.savefig(fiout, bbox_inches='tight', pad_inches=0)
 
 class JobDraw2D(aares.Job):
+    long_description = ''
+
+    short_description = prog_short_description
+
+    system_phil = phil_core
+
     def __set_meta__(self):
         '''
         Sets various package metadata

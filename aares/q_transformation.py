@@ -11,11 +11,15 @@ import os
 
 prog_short_description = 'Transforms file Q-space coordinates'
 
+prog_long_description = '''
+This job perform Q-transformation, e.g. assigns each pixels of the detector with appropriate Q-value. At this point, only lengths of the Q-vectors are used. The calculation is performed individually for each group of files with the same geometry. The Q-values are stored in `*.q_space.h5a`.
+'''
+
 phil_core_str = '''
 q_transformation {
 units = *nm A
 .type = choice
-.help = 'Units to be used. The length of scattering vector (:math:`q`) is calculated as :math:`4\pi*sin \\theta/\lambda` in inverse units of choice.'
+.help = 'Units to be used. The length of scattering vector (:math:`q`) is calculated as :math:`4\\pi*sin \\theta/\\lambda` in inverse units of choice.'
 
 geometry {
     beam_center_px = None
@@ -478,6 +482,11 @@ class ArrayQ(h5z.SaxspointH5):
 
 
 class JobQtrasform(aares.Job):
+    long_description = ''
+
+    short_description = prog_short_description
+
+    system_phil = phil_core
 
     def __set_meta__(self):
         super().__set_meta__()

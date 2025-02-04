@@ -29,6 +29,42 @@ from aares import my_print
 
 prog_short_description = 'Finds and import the data files'
 
+prog_long_description = '''
+This job imports the data files in the  AAres environment. Specified path(s) is searched for compatible data files (h5 or h5z). During the import, list of files is summarized in FLS file, which allows to modify some metadata and control some file-specific settings. Data file headers are also analysed and extracted to HDR file. This is done because of the internal layout of H5Z files and it should speed up reprocessing.
+
+Typical usage
+-------------
+
+The expected parameters are path(s) to a file tree with `h5` or `h5z` files, or individual files. The path is recursively searched for the files. For example:
+
+```
+aares.import data
+```
+
+The command prodces two files: 
+ * `files.fls`: Text file with list of imported files  
+ * `hdr`: extracted file headers
+ 
+The files are also assigned to groups based on the geometry of the experiment. This might play a role for example, if collect the data at different sample to detector distances. In typical cases, there should be only one group.  
+
+Dataset names
+-------------
+
+On import, each file is assigned with a unique name. The uniqueness is achieved by prepending the name with a number; typically the files will be ordered by the time of collection. The rest of the name is generated either from the file name or from sample name stored in the h5z file header. This behaviour is controlled using `name=`.
+
+File list update
+-----------
+
+If the FLS file already exist, it can be updated with new files. In this mode, files which are new or changed since last imported will be analyzed. The file change is determined using MD5 checksum. This feature is handy, when you want to process the files during the data collection:
+
+```
+aares.import data files.fls
+```
+
+Full specification of FLS file is available [here](../FLS_file.md)
+
+'''
+
 phil_core = phil.parse('''
 to_import {
 search_string = None
@@ -37,7 +73,8 @@ search_string = None
 .multiple = True
 .type = str
 
-suffix = h5z h5
+suffix = 'h5z' 'h5'
+.type = strings
 .help = Suffixes to search for. Only HDF5 files are used by the software.
 
 output = files.fls
@@ -112,6 +149,12 @@ class JobImport(aares.Job):
     """
     Run class based on generic AAres run class
     """
+
+    long_description = prog_long_description
+
+    short_description = prog_short_description
+
+    system_phil = phil_core
 
     def __set_meta__(self):
         '''
