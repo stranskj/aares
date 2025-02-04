@@ -58,7 +58,7 @@ If the FLS file already exist, it can be updated with new files. In this mode, f
 aares.import data files.fls
 ```
 
-Full specification of FLS file is available [here](FLS_file.md)
+Full specification of FLS file is available [here](../FLS_file.md)
 
 '''
 
