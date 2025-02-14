@@ -211,15 +211,15 @@ class JobImport(aares.Job):
         files = aares.datafiles.phil_files.format(run.file_groups)
         #       print(files.as_str(expert_level=0))
 
-        if self.params.to_import.detect_background:
-            if ' ' in self.params.to_import.background_detection.pattern:
-                self.params.to_import.background_detection.pattern = self.params.to_import.background_detection.pattern.split(' ')
-            my_print('Detecting background files...')
-            run.detect_background(self.params.to_import.background_detection.pattern, self.params.to_import.background_detection.search_in)
-
-        if self.params.to_import.assign_background:
-            my_print('Assigning background files...')
-            run.assign_background(self.params.to_import.background_assignment.method)
+        # if self.params.to_import.detect_background:
+        #     if ' ' in self.params.to_import.background_detection.pattern:
+        #         self.params.to_import.background_detection.pattern = self.params.to_import.background_detection.pattern.split(' ')
+        #     my_print('Detecting background files...')
+        #     run.detect_background(self.params.to_import.background_detection.pattern, self.params.to_import.background_detection.search_in)
+        #
+        # if self.params.to_import.assign_background:
+        #     my_print('Assigning background files...')
+        #     run.assign_background(self.params.to_import.background_assignment.method)
 
         if self.params.to_import.output is not None:
             run.write_groups(self.params.to_import.output)
