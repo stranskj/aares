@@ -790,7 +790,7 @@ class DataFilesCarrier:
                     common_path = os.path.commonpath(filepaths)
                     for fi in group.file:
                         if len(common_path) > 0:
-                            fi.name = fi.name.split(common_path)[1].strip('.\/_'+sep+os.sep)
+                            fi.name = fi.name.split(common_path)[1].strip('.\\/_'+sep+os.sep)
                         else:
                             fi.name = fi.path
                         fi.name = os.path.splitext(fi.name)[0].replace(os.sep,'_')
