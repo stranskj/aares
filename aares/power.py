@@ -18,7 +18,7 @@ job_control {
     
     jobs = None
     .help = 'Number of jobs to be processed in parallel. One job processes one range of frames, which'
-            ' is usually one file. Therefore this setting is useful optimizing hard drive load.'
+            ' is usually one file. Therefore this setting is useful for optimizing hard drive load.'
             ' If None, determined automatically.'
     .type = int
     
