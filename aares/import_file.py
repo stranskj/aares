@@ -30,7 +30,7 @@ from aares import my_print
 prog_short_description = 'Finds and import the data files'
 
 prog_long_description = '''
-This job imports the data files in the  AAres environment. Specified path(s) is searched for compatible data files (h5 or h5z). During the import, list of files is summarized in FLS file, which allows to modify some metadata and control some file-specific settings. Data file headers are also analysed and extracted to HDR file. This is done because of the internal layout of H5Z files and it should speed up reprocessing.
+This job imports the data files into the AAres environment. Specified path(s) is searched for compatible data files (h5 or h5z). During the import, list of files is summarized in a FLS file, which allows to modify some metadata and control some file-specific settings. Data file headers are also analysed and extracted to HDR file. This is done because of the internal layout of H5Z files, and it should speed up reprocessing.
 
 Typical usage
 -------------
@@ -41,21 +41,21 @@ The expected parameters are path(s) to a file tree with `h5` or `h5z` files, or 
 aares.import data
 ```
 
-The command prodces two files: 
+The command produces two files: 
  * `files.fls`: Text file with list of imported files  
  * `hdr`: extracted file headers
  
-The files are also assigned to groups based on the geometry of the experiment. This might play a role for example, if collect the data at different sample to detector distances. In typical cases, there should be only one group.  
+The files are also assigned to groups based on the geometry of the experiment. This might play a role for example, if collect the data were collected at different sample to detector distances. In typical cases, there should be only one group.  
 
 Dataset names
 -------------
 
-On import, each file is assigned with a unique name. The uniqueness is achieved by prepending the name with a number; typically the files will be ordered by the time of collection. The rest of the name is generated either from the file name or from sample name stored in the h5z file header. This behaviour is controlled using `name=`.
+Upon import, a unique name is assigned to each file. The uniqueness is achieved by prepending the name with a number; typically the files will be ordered by the time of collection. The rest of the name is generated either from the file name or from sample name stored in the h5z file header. This behaviour is controlled using `name=`.
 
 File list update
 -----------
 
-If the FLS file already exist, it can be updated with new files. In this mode, files which are new or changed since last imported will be analyzed. The file change is determined using MD5 checksum. This feature is handy, when you want to process the files during the data collection:
+If the FLS file already exists, it can be updated with new files. In this mode, files which are new or have changed since the last import will be analyzed. The file change is determined using MD5 checksum. This feature is handy, when you want to process the files during data collection:
 
 ```
 aares.import data files.fls
@@ -68,7 +68,7 @@ Full specification of FLS file is available [here](../FLS_file.md)
 phil_core = phil.parse('''
 to_import {
 search_string = None
-.help = 'How should be searched for the file. If it is a folder, it is searched recursively for all'
+.help = 'Search string or path to the data. If it is a folder, it is searched recursively for all'
         ' data files. Bash-like regex strings are accepted.'
 .multiple = True
 .type = str
@@ -82,7 +82,7 @@ output = files.fls
 .type = path
 
 headers = None
-.help = File name, where to store preparsed headers. If None, determined from "output"
+.help = File name, where to store extracted data-file headers. If None, determined from "output".
 .type = path
 
 input_file = None
@@ -95,7 +95,7 @@ name_from = None sample *file_name
 .type = choice
 
 shorten = True
-.help = Strip the common parts of the file name, when generating the name
+.help = Strips the common parts of the file name, when generating the name
 .type = bool
 
 prefix = None *time file_name
@@ -108,7 +108,7 @@ force_headers = False
 
 ignore_merged = True
 .help = 'Ignore files with merged frames. Using these diminish some of the AAres features. Moreover,'
-        'no special handling fo these is implemented, which can lead to unexpected results.'
+        'no special handling of these is implemented, which can lead to unexpected results.'
 .type = bool
 .expert_level = 1
 
