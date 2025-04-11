@@ -157,7 +157,7 @@ AAres tools
     with open(os.path.join(out_path,'FLS_file.md'), 'w') as flist:
         md = phildoc.phil_to_markdown(aares.datafiles.phil_files,
                                       title= 'FLS file description',
-                                      description='This file hold user accesible/editable information about the data files in use. The files are devided into groups by common experimental geometry. The order of files with in the grou deos not matter.',
+                                      description='This file holds user accessible/editable information about the data files in use. The files are divided into groups by common experimental geometry. The order of files within the group does not matter.',
                                       default_scope_description=True)
         flist.write(md)
         flist.write('\n---------\n\n## Full PHIL\n\n')
