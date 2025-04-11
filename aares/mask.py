@@ -32,25 +32,25 @@ import os
 prog_short_description = 'Generates frame mask'
 
 prog_long_description = '''
-Mask job generates a detector mask based on several sources:
+The mask job generates a detector mask based on several sources:
 
  * Detector mask
  * Beamstop postion
  * Custom mask
  
-The detector mask is genereated from known geometry of used detector. The information can be read either from data file (`h5z` or `h5`) or using FLS-file. Typically, pixels between modules and at the edges are excluded. If the data file contains pixel mask, it is also used.
+The detector mask is generated from the known geometry of the detector. The information can be read either from data file (`h5z` or `h5`) or using FLS-file. Typically, pixels between modules and at the edges are excluded. If the data file contains pixel mask, it is also used.
 
-The beamstop mask can be automatically generated: to enable it, set beamstop size bigger than 0 (for example: `beamstop.size=2`. It is expected, that the shape is rectangle with rounded top. In automatic mode, the beamstop tilt is calculated from beamcenter position and asumption, that bottom of the beamstop is in the middle of the detector. 
+The beamstop mask can be automatically generated: to enable it, set beamstop size bigger than 0 (for example: `beamstop.size=2`. It is expected, that the shape is a rectangle with a rounded top. In automatic mode, the beamstop tilt is calculated from the beam center position and assumption, that the bottom of the beamstop is in the middle of the detector. 
 
-Custom mask can be provided using a PNG file. The job parameters define, how the file should be interpreted. In the default setup, PNG with transparency (alpha channel) is expected, and the transparent pixels are  masked. This can be easily achieved using GIMP:
+A custom mask can be provided using a PNG file. The job parameters define, how the file should be interpreted. In the default setup, PNG with transparency (alpha channel) is expected, and the transparent pixels are  masked. This can be easily achieved using GIMP:
 
  1. Open a PNG with 2D image created using `aares.draw2d`
  2. Using selection, select the unwanted pixels and hit `Delete` key.
  3. Export the result into new PNG file.
  
-The output is new PNG file, where white pixels are excluded and the transparent used. This can be used for checking the mask, when the PNG with the mask is loaded as a new layer with the 2D image (in GIMP `File -> Open as layers`).
+The output is a new PNG file, where white pixels are excluded and the transparent ones are used. This can be used for checking the mask, when the PNG with the mask is loaded as a new layer with the 2D image (in GIMP `File -> Open as layers`).
 
-In the each masking step, absolute number of masked pixels and percentage of masked detector area is reported.
+In each masking step, the absolute number of masked pixels and percentage of masked detector area is reported.
 '''
 
 phil_core = phil.parse('''
@@ -66,7 +66,7 @@ output = mask.png
 .help = Output mask for further usage. It can be of H5 or PNG format
 
 beamstop 
-    .help = Automatic beamstop masking. The beamstop is expected to be tilted rectangle with half-circle top.
+    .help = Automatic beamstop masking. The beamstop is expected to be a tilted rectangle with a  half-circle top.
 {
     size = 0
     .type = float
@@ -104,7 +104,7 @@ custom
     
     threshold = 128
     .type = int
-    .help = If value is higher than the threshold, the pixel is masked out.
+    .help = If the value is higher than the threshold, the pixel is masked.
     } 
     
 pixel_mask = True
