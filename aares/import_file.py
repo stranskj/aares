@@ -119,7 +119,7 @@ detect_background = True
 background_detection {
     pattern = "buffer pufr matrix"
     .type = str
-    .help = 'A string to search for to flag the sample as background. Multiple space separated can be provided.'
+    .help = 'A string to search for to flag the sample as background. Multiple space separated can be provided. The search accepts Python Regex syntax (see https://docs.python.org/3/library/re.html#regular-expression-syntax)'
     #.multiple = True
     
     search_in = *name path
