@@ -131,7 +131,7 @@ def recompress(path1, path2, log=False, compression='gzip'):
     :returns: A tuple(original_size, new_size)
     """
     with h5py.File(path1, "r") as in_file, h5py.File(path2, "w") as out_file:
-        walk(in_file, out_file, log=log, compression=compression)
+        walk_compress(in_file, out_file, log=log, compression=compression)
     return os.stat(path1).st_size, os.stat(path2).st_size
 
 def groupH5_to_scope(group):
@@ -287,12 +287,12 @@ def ItemH5(item_in):
 
 class GroupH5(dict):
     """
-    Class mimiking h5py.Group
+    Class mimicking h5py.Group
 
-    Instances of this class can be entirely hold in memory without any connection to a file. The instance is also
-    picklable, therefore can be used to pass around data during multiprocessing with concurrent.futures.
+    Instances of this class can be entirely held in memory without any connection to a file. The instance is also
+    pickleable, therefore, can be used to pass around data during multiprocessing with concurrent.futures.
 
-    The class mimiks h5py.Group, however, the feature set might not be complete and it can evolve with the project.
+    The class mimics h5py.Group, however, the feature set might not be complete, and it can evolve with the project.
     """
 
     def __init__(self, source_group=None, name=None, exclude=None):
