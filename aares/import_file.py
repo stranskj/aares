@@ -24,6 +24,7 @@ import aares.datafiles #import phil_files, is_fls
 #from aares.datafiles import DataFilesCarrier
 import freephil as phil
 import os
+import aares.power
 
 from aares import my_print
 
@@ -141,7 +142,9 @@ background_assignment {
 }
 
 }
-''')
+
+include scope aares.power.phil_job_control
+''', process_includes=True)
 
 
 
