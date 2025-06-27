@@ -230,7 +230,8 @@ def get_headers_dict(file_list, nproc=None, sort=None):
         for job in concurrent.futures.as_completed(jobs):
             fi = jobs[job]
             try:
-                headers_out[fi] = job.result()
+                if job.result() is not None:
+                    headers_out[fi] = job.result()
             except pickle.PickleError:   # A bit dirty hack for files loaded using class factory
                 logging.debug('Processing unpicklable file...')
                 headers_out[fi] = aares.datafiles.read_file(fi)

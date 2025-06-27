@@ -37,15 +37,20 @@ def get_file_type(fin):
             #     return aares.datafiles.data1D.Reduced1D
             # else:
             #     return tp
-    raise TypeError('Unknown file type')
+    raise TypeError('Unknown file type: {}'.format(fin))
 
 def read_file(path):
     '''
     Reads file using associtated class
     '''
     logging.debug('Reading file %s', path)
-    file_class = get_file_type(path)
-    return file_class(path)
+    try:
+        file_class = get_file_type(path)
+        out = file_class(path)
+    except TypeError:
+        logging.debug('File type not recognised: {}'.format(path))
+        out = None
+    return out
 
 group_phil_str = '''
     name = None
