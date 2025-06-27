@@ -617,13 +617,14 @@ class SaxspointH5(InstrumentFileH5):
     :ivar geometry_fields: List of fields, which describe the experiment geometry
     """
 
-    # skip_entries = ['entry/data/data',
-    #                 'entry/data/x_pixel_offset',
-    #                 'entry/data/y_pixel_offset',
-    #                 'entry/instrument/detector/data',
-    #                 # 'entry/instrument/detector/x_pixel_offset',
-    #                 # 'entry/instrument/detector/y_pixel_offset',
-    #                 ]
+    __skip_entries = ['entry/data/data',
+                     'entry/data/x_pixel_offset',
+                     'entry/data/y_pixel_offset',
+                     'entry/instrument/detector/data',
+
+                     # 'entry/instrument/detector/x_pixel_offset',
+                     # 'entry/instrument/detector/y_pixel_offset',
+                     ]
 
     geometry_fields = [
         'entry/instrument/detector/depends_on',
@@ -651,13 +652,7 @@ class SaxspointH5(InstrumentFileH5):
         # self._h5 = h5py.File(self.__temp, 'a')
         # self._h5
 
-        self._skip_entries = ['entry/data/data',
-                        'entry/data/x_pixel_offset',
-                        'entry/data/y_pixel_offset',
-                        'entry/instrument/detector/data',
-                        # 'entry/instrument/detector/x_pixel_offset',
-                        # 'entry/instrument/detector/y_pixel_offset',
-                        ]
+        self._skip_entries = copy.copy(self.__skip_entries)
         #if skip_entries is not None:
         #    self.skip_entries = skip_entries
 
@@ -710,13 +705,7 @@ class SaxspointH5(InstrumentFileH5):
         if hasattr(self, '_custom_skip_entries') and self._custom_skip_entries:
             return self._skip_entries
         else:
-            return ['entry/data/data',
-         'entry/data/x_pixel_offset',
-         'entry/data/y_pixel_offset',
-         'entry/instrument/detector/data',
-         # 'entry/instrument/detector/x_pixel_offset',
-         # 'entry/instrument/detector/y_pixel_offset',
-         ]
+            return copy.copy(self.__skip_entries)
 
     @skip_entries.setter
     def skip_entries(self, val):
