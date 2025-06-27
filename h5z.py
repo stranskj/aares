@@ -621,7 +621,10 @@ class SaxspointH5(InstrumentFileH5):
                      'entry/data/x_pixel_offset',
                      'entry/data/y_pixel_offset',
                      'entry/instrument/detector/data',
-
+                     'entry/data/direct_beam_image',
+                     'entry/data/transmitted_beam_image',
+                     'entry/instrument/detector/direct_beam_image',
+                     'entry/instrument/detector/transmitted_beam_image'
                      # 'entry/instrument/detector/x_pixel_offset',
                      # 'entry/instrument/detector/y_pixel_offset',
                      ]
