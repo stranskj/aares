@@ -1,3 +1,4 @@
+import concurrent.futures
 import copy
 import glob
 import itertools
@@ -6,6 +7,7 @@ import os
 import logging
 import re
 import datetime
+import tqdm #.contrib
 
 import freephil as phil
 
@@ -128,7 +130,7 @@ group
 ''')
 
 
-def validate_hdf5_files(files):
+def validate_hdf5_files(files, nproc=None):
     """
     Checks, if the list of files are valid HDF5. Those, which are not are removed from the list.
 
@@ -136,8 +138,13 @@ def validate_hdf5_files(files):
     :type files: List of strings
     """
     assert isinstance(files,list)
-    for fi in files:
-        if not h5z.is_h5_file(fi):
+
+    #valid = tqdm.contrib.process_map(h5z.is_h5_file, files,max_workers=nproc)
+    with concurrent.futures.ProcessPoolExecutor(max_workers=nproc) as executor:
+        valid = list(tqdm.tqdm(executor.map(h5z.is_h5_file, files), total=len(files)))
+
+    for fi, val in zip(files, valid):
+        if not val:
             logging.warning(f'File is invalid or cannot be read, skipping: {fi}')
             files.remove(fi)
 
