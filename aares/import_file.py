@@ -178,6 +178,8 @@ class JobImport(aares.Job):
         if not aares.datafiles.is_fls(self.params.to_import.output):
             logging.warning('The file extension should be ".fls". Different extension might cause troubles.')
 
+        nproc = self.params.job_control.nproc
+
         if len(self.params.to_import.input_file) > 0:
             aares.my_print('Processing files based on content of file(s):')
             for fi in self.params.to_import.input_file:
@@ -189,7 +191,7 @@ class JobImport(aares.Job):
                 raise aares.RuntimeErrorUser(e)
 
             aares.my_print('\nGetting headers extracted earlier...')
-            run = aares.datafiles.DataFilesCarrier(file_phil=file_scope, mainphil=self.system_phil)
+            run = aares.datafiles.DataFilesCarrier(file_phil=file_scope, mainphil=self.system_phil, nproc=nproc)
             if self.params.to_import.force_headers:
                 aares.my_print('\nRe-reading the file headers...')
                 run.read_headers()
@@ -208,7 +210,7 @@ class JobImport(aares.Job):
                  self.params.to_import.headers = os.path.splitext(self.params.to_import.output)[0]+'.hdr'
             run.header_file = self.params.to_import.headers
         else:
-            run = aares.datafiles.DataFilesCarrier(run_phil=self.params.to_import, mainphil=self.system_phil)
+            run = aares.datafiles.DataFilesCarrier(run_phil=self.params.to_import, mainphil=self.system_phil, nproc=nproc)
             aares.report.log_number_of_frames(run.files_dict)
 
         files = aares.datafiles.phil_files.format(run.file_groups)

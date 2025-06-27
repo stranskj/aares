@@ -600,7 +600,7 @@ class DataFilesCarrier:
         aares.my_print('Found {} files.'.format(len(files)))
 
         logging.debug('Validating files...')
-        validate_hdf5_files(files)
+        validate_hdf5_files(files, nproc= self.nproc)
         logging.debug('Number of valid files: {}'.format(len(files)))
 
         if len(files) == 0:
