@@ -43,6 +43,7 @@ def read_file(path):
     '''
     Reads file using associtated class
     '''
+    logging.debug('Reading file %s', path)
     file_class = get_file_type(path)
     return file_class(path)
 
@@ -584,14 +585,19 @@ class DataFilesCarrier:
             raise AttributeError('Wrong input Phil parameters.')
 
         files = get_files(phil_in.search_string, phil_in.suffix)
-        aares.my_print('Found {} files. Reading headers...'.format(len(files)))
+        aares.my_print('Found {} files.'.format(len(files)))
 
+        logging.debug('Validating files...')
         validate_hdf5_files(files)
+        logging.debug('Number of valid files: {}'.format(len(files)))
 
         if len(files) == 0:
             raise aares.RuntimeErrorUser('No usable files found.')
 
+        aares.my_print('Reading headers...')
         self.files_dict = pwr.get_headers_dict(files, nproc=self.nproc)
+
+        logging.debug('Validating headers...')
         validate_headers(self.files_dict)
 
         if phil_in.ignore_merged:
