@@ -148,7 +148,7 @@ def search_files(indir, suffix):
 def create_directory(dir, stop=False):
     if not os.path.isdir(dir):
         try:
-            os.mkdir(dir)
+            os.makedirs(dir)
             my_print('Created directory: {}'.format(dir))
         except OSError:
             raise RuntimeErrorUser('Path is not a directory: {}'.format(dir))

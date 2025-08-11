@@ -11,6 +11,7 @@ Angular reduction
 @contact:    jan.stransky@ibt.cas.cz
 @deffield    updated: Updated
 """
+import copy
 import shutil
 
 import h5z
@@ -1103,11 +1104,16 @@ class JobReduction(aares.Job):
         for group in imported_files.file_groups:
             aares.my_print('Reducing files in group {}:'.format(group.name))
 
+            output_params = copy.deepcopy(self.params.output)
+
+            if len(imported_files.file_groups) > 1:
+                output_params.directory = os.path.join(output_params.directory, group.name)
+
             integrate_group(group, imported_files.files_dict,
                             job_control=self.params.job_control,
                             export=self.params.export,
                             reduction=self.params.reduction,
-                            output=self.params.output)  # TODO: prepare job_control
+                            output=output_params)  # TODO: prepare job_control
 
         # The output file names are updated with in processing of the group.
         imported_files.write_groups(file_out=self.params.output.files)
