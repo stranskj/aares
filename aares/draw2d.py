@@ -21,6 +21,9 @@ import freephil as phil
 
 __all__ = []
 __version__ = aares.__version__
+
+from aares import my_print
+
 prog_short_description = 'Draws the frame into a PNG file'
 
 import numpy
@@ -256,16 +259,30 @@ class JobDraw2D(aares.Job):
             if self.params.nproc == 0:
                 self.params.nproc = multiprocessing.cpu_count()
             aares.my_print('Using {} processors.'.format(self.params.nproc))
+            groups_num = len(fls.file_groups)
+            if groups_num > 1:
+                my_print('Multiple geometry groups detected, outputting to individual folders.')
+
             with (concurrent.futures.ProcessPoolExecutor(self.params.nproc) as ex,
                   tqdm(total=len(fls)) as pbar):
                 jobs = {}
                 try:
-                    for name in fls.files(key='name'):
-                        fi_path = fls.get_file_scope(name).path
+
+                    for group in fls.file_groups:
+                        if groups_num > 1:
+                            logging.info('Creating folder: {}'.format(group.name))
+                            aares.create_directory(os.path.join(out_dir,group.name))
+                        for name in group.files_by_name.keys():
+                            fi_path = fls.get_file_scope(name).path
                        # aares.my_print('\nDrawing: {}'.format(name))
-                        jobs[ex.submit(draw_file,
+                            if groups_num > 1:
+                                output_name = os.path.join(out_dir,group.name,name+'.png')
+                            else:
+                                output_name = os.path.join(out_dir,name+'.png')
+                            logging.info('File to be drawn: {}\n to: {}'.format(fi_path, output_name))
+                            jobs[ex.submit(draw_file,
                                               fi_path,
-                                              output=os.path.join(out_dir,name+'.png'),
+                                              output=output_name,
                                               params=self.params)] = name
                         # draw_file(fi_path,
                         #           output=os.path.join(out_dir,name+'.png'),
