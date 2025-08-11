@@ -1113,7 +1113,7 @@ class JobReduction(aares.Job):
                             job_control=self.params.job_control,
                             export=self.params.export,
                             reduction=self.params.reduction,
-                            output=output_params)  # TODO: prepare job_control
+                            output=output_params)
 
         # The output file names are updated with in processing of the group.
         imported_files.write_groups(file_out=self.params.output.files)

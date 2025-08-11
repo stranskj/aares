@@ -208,9 +208,15 @@ class JobSubtract(aares.Job):
             files_in = aares.datafiles.DataFilesCarrier(file_phil=self.params.input_files, mainphil=self.system_phil)
             files_out = copy.deepcopy(files_in)
             files_out.file_groups = []
-            aares.create_directory(self.params.output.directory)
+
             for group in files_in.file_groups:
-                output_group = subtract_group(group, files_in.files_dict, self.params.output.directory, export=export)
+
+                output_params = copy.deepcopy(self.params.output)
+                if len(files_in.file_groups) > 1:
+                    output_params.directory = os.path.join(output_params.directory, group.name)
+                aares.create_directory(output_params.directory)
+
+                output_group = subtract_group(group, files_in.files_dict, output_params.directory, export=export)
                 files_out.file_groups.append(output_group)
 
             files_out.write_groups(self.params.output.out_files)
