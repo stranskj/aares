@@ -1,0 +1,11 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+  - family-names: Stransky
+    given-names: Jan
+    orcid: https://orcid.org/0000-0001-5139-2567
+title: AAres
+version: 0.2.5.1
+doi: 10.5281/zenodo.18184192
+date-released: 2026-01-08
+license: "GPL-3.0-or-later"
