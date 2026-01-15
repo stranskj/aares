@@ -1,6 +1,6 @@
 [build-system]
 requires = [
-  "setuptools >= 40.9.0",
+  "setuptools >= 40.9.0, <81",
   "setuptools-scm",
   "wheel",
 ]
@@ -24,7 +24,7 @@ classifiers = [
 dependencies = [
   "dateparser",
   "h5py",
-  "numpy",
+  "numpy<2.4",
   "matplotlib",
   "freephil",
   "pillow",
